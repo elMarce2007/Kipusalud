@@ -1,0 +1,44 @@
+# Build output
+**/target/
+**/*.jar
+**/*.class
+
+# IDE
+.idea/
+**/*.iml
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+**/*.log
+**/logs/
+
+# Test files
+**/test/
+**/*Test.java
+**/*Tests.java
+
+# Maven wrapper (if using)
+.mvn/
+mvnw
+mvnw.cmd
+
+# Scripts not needed in container
+start-kipusalud.bat
+
+# Kubernetes and Docker configs (not needed inside images)
+k8s/
+docker-compose.yml
+.env*

@@ -1,0 +1,357 @@
+services:
+  # ===================
+  # Infrastructure
+  # ===================
+  psql:
+    image: postgres:16-alpine
+    container_name: kipusalud-psql
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "localhost", "-U", "postgres", "-d", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - kipusalud-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: kipusalud-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-kipusalud}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-change-me}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - kipusalud-network
+
+  # ===================
+  # Discovery & Config
+  # ===================
+  discovery-server:
+    build:
+      context: .
+      dockerfile: discovery-server/Dockerfile
+    container_name: kipusalud-discovery
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "8761:8761"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - kipusalud-network
+
+  config-server:
+    build:
+      context: .
+      dockerfile: config-server/Dockerfile
+    container_name: kipusalud-config
+    environment:
+      SPRING_PROFILES_ACTIVE: native,docker
+    ports:
+      - "8888:8888"
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8888/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - kipusalud-network
+
+  # ===================
+  # API Gateway
+  # ===================
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: kipusalud-gateway
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+    ports:
+      - "8080:8080"
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      cliente-service:
+        condition: service_healthy
+      catalogo-service:
+        condition: service_healthy
+      ventas-service:
+        condition: service_healthy
+      personal-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - kipusalud-network
+
+  # ===================
+  # Business Services
+  # ===================
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    container_name: kipusalud-auth
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: psql
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+    ports:
+      - "8081:8081"
+    depends_on:
+      psql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - kipusalud-network
+
+  cliente-service:
+    build:
+      context: .
+      dockerfile: cliente-service/Dockerfile
+    container_name: kipusalud-cliente
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: psql
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    ports:
+       - "8082:8082"
+       - "9091:9091"
+    depends_on:
+      psql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - kipusalud-network
+
+  catalogo-service:
+    build:
+      context: .
+      dockerfile: catalogo-service/Dockerfile
+    container_name: kipusalud-catalogo
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: psql
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-kipusalud}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-change-me}
+    ports:
+      - "8083:8083"
+      - "9092:9092"
+    depends_on:
+      psql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - kipusalud-network
+
+  ventas-service:
+    build:
+      context: .
+      dockerfile: ventas-service/Dockerfile
+    container_name: kipusalud-ventas
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: psql
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-kipusalud}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-change-me}
+      CATALOGO_SERVICE_URL: http://catalogo-service:8083
+      CLIENTE_SERVICE_URL: http://cliente-service:8082
+      SUNAT_MASTER_KEY: ${SUNAT_MASTER_KEY:-}
+      SUNAT_ENVIRONMENT: ${SUNAT_ENVIRONMENT:-BETA}
+      SUNAT_BETA_URL: ${SUNAT_BETA_URL:-https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService}
+      SUNAT_PRODUCTION_URL: ${SUNAT_PRODUCTION_URL:-}
+      SUNAT_PRODUCTION_ENABLED: ${SUNAT_PRODUCTION_ENABLED:-false}
+    ports:
+      - "8084:8084"
+      - "9090:9090"
+    depends_on:
+      psql:
+        condition: service_healthy
+      catalogo-service:
+        condition: service_healthy
+      cliente-service:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8084/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - kipusalud-network
+
+  audit-service:
+    build:
+      context: .
+      dockerfile: audit-service/Dockerfile
+    container_name: kipusalud-audit
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: psql
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-kipusalud}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-change-me}
+    ports:
+      - "8086:8086"
+    depends_on:
+      psql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8086/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - kipusalud-network
+
+  personal-service:
+    build:
+      context: .
+      dockerfile: personal-service/Dockerfile
+    container_name: kipusalud-personal
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: psql
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    ports:
+      - "8085:8085"
+      - "9093:9093"
+    depends_on:
+      psql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8085/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - kipusalud-network
+
+  # ===================
+  # Frontend
+  # ===================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: kipusalud-frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - kipusalud-network
+
+networks:
+  kipusalud-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  rabbitmq_data:

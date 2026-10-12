@@ -1,0 +1,62 @@
+server:
+  port: 8084
+
+catalogo-service:
+  url: ${CATALOGO_SERVICE_URL:http://localhost:8083}
+
+cliente-service:
+  url: ${CLIENTE_SERVICE_URL:http://localhost:8082}
+
+sunat:
+  master-key: ${SUNAT_MASTER_KEY:}
+  environment: ${SUNAT_ENVIRONMENT:BETA}
+  beta-url: ${SUNAT_BETA_URL:https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService}
+  production-url: ${SUNAT_PRODUCTION_URL:}
+  production-enabled: ${SUNAT_PRODUCTION_ENABLED:false}
+
+jwt:
+  secret: ${JWT_SECRET}
+
+spring:
+  application:
+    name: ventas-service
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:kipusalud}
+    password: ${RABBITMQ_PASSWORD:change-me}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        default-requeue-rejected: false
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ventas_db
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

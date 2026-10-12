@@ -1,0 +1,45 @@
+server:
+  port: 8084
+
+catalogo-service:
+  url: ${CATALOGO_SERVICE_URL:http://catalogo-service:8083}
+
+cliente-service:
+  url: ${CLIENTE_SERVICE_URL:http://cliente-service:8082}
+
+jwt:
+  secret: ${JWT_SECRET}
+
+spring:
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}
+  application:
+    name: ventas-service
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/ventas_db
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://discovery-server:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

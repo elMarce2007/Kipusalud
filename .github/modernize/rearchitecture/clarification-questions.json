@@ -1,0 +1,559 @@
+{
+  "schema": "clarification-questions/v1",
+  "generated_at": "2026-10-07T19:06:30Z",
+  "user_input": "Okay, empieza a implementar todas las funciones de casos de uso propuestos.md tan to en el backend como en el frontend.",
+  "title": "Implementación integral de casos de uso KipuSalud",
+  "assessment_snapshot": {
+    "intro": "El repositorio ya contiene una aplicación Angular y una arquitectura de microservicios Spring Boot con PostgreSQL/Flyway, tenancy por farmacia y APIs operativas. El catálogo de casos de uso describe además flujos aún no implementados:",
+    "bullets": [
+      "Angular 21.1 con Angular Material 21.1, rutas Angular, señales/RxJS y tema KipuSalud existente; las exportaciones Stitch se encuentran en /home/marce/Descargas/stitch_kipusalud_inca_theme_homepage/.",
+      "Spring Boot 3.2.3, Java 17, API Gateway, servicios auth/clientes/catálogo/ventas/personal, PostgreSQL y migraciones Flyway; JWT y aislamiento multi-tenant ya tienen implementación inicial.",
+      "Los casos de uso cubren planes/checkout, suscripciones y pagos con webhooks, alta de farmacia, temas por farmacia, catálogo por lotes/FEFO, recepción/Kardex, importación CSV/XLSX, alertas, anulación auditable, membresías/roles, operadores de plataforma y controles de acceso.",
+      "Las decisiones del documento indican pasarela desacoplada sin proveedor escogido, siete días de gracia de renovación y modo solo lectura después; una suscripción por farmacia; importaciones validadas sin ejecutar SQL; ventas anuladas con motivo/auditoría; y desactivación de membresía sin borrar usuarios.",
+      "Siguen sin definirse precios, moneda, renovación, reembolsos, verificación de correo, acceso prolongado en solo lectura y si las herramientas de operador pertenecen a la primera versión. Las exportaciones Stitch/PDF son referencias y contienen elementos de demostración."
+    ]
+  },
+  "proposed_outcome": "Implementar, en el repositorio existente y preservando la arquitectura multi-servicio, los casos de uso acordados en casos-de-uso-propuestos.md de extremo a extremo: contratos/API y persistencia, autorización por farmacia/rol, experiencia Angular real, migraciones seguras y pruebas automatizadas. No simular pagos ni integraciones externas, no mostrar acciones ficticias, y no modificar el PDF fuente ni las exportaciones originales de Stitch.",
+  "scope": [
+    "frontend",
+    "backend",
+    "generic"
+  ],
+  "status": "answered",
+  "questions": [
+    {
+      "id": "F1",
+      "kit": "frontend",
+      "field": "target.framework",
+      "title": "Framework del frontend",
+      "question": "¿Confirmas mantener Angular 21.1 para implementar las vistas y flujos?",
+      "importance": "required",
+      "impact": 5,
+      "recommended": "Angular 21.1",
+      "default": null,
+      "prefilled": true,
+      "prefilled_value": "Angular 21.1",
+      "answer": {
+        "value": "Angular 21.1",
+        "source": "user"
+      },
+      "depends_on": null,
+      "options": [
+        {
+          "value": "Angular 21.1",
+          "label": "Angular 21.1 (actual)"
+        },
+        {
+          "value": "Otro",
+          "label": "Otro framework/versión"
+        }
+      ],
+      "allow_other": true,
+      "type": "single_select"
+    },
+    {
+      "id": "F2",
+      "kit": "frontend",
+      "field": "target.component_library",
+      "title": "Biblioteca de componentes",
+      "question": "¿Qué biblioteca visual debemos mantener para las nuevas y adaptadas pantallas?",
+      "importance": "required",
+      "impact": 5,
+      "recommended": "Angular Material 21.1",
+      "default": null,
+      "prefilled": true,
+      "prefilled_value": "Angular Material 21.1",
+      "answer": {
+        "value": "La que sea necesaria, si se puede usar Angular Material, mejor, pero si no es posible mantenerse leal a los diseños de stitch y solo usar angular material, entonces usa otras bibliotecas.",
+        "source": "user"
+      },
+      "depends_on": null,
+      "options": [
+        {
+          "value": "Angular Material 21.1",
+          "label": "Angular Material 21.1 (actual)"
+        },
+        {
+          "value": "Otra",
+          "label": "Otra biblioteca"
+        }
+      ],
+      "allow_other": true,
+      "type": "single_select"
+    },
+    {
+      "id": "F3",
+      "kit": "frontend",
+      "field": "visual.screenshots",
+      "title": "Referencias visuales",
+      "question": "¿Confirmas usar las pantallas Stitch exportadas como referencia y adaptar su estructura al Angular existente, dejando intactos los HTML originales?",
+      "importance": "required",
+      "impact": 5,
+      "recommended": null,
+      "default": null,
+      "prefilled": true,
+      "prefilled_value": "/home/marce/Descargas/stitch_kipusalud_inca_theme_homepage/ — exportaciones HTML de las vistas del proyecto KipuSalud",
+      "answer": {
+        "value": "/home/marce/Descargas/stitch_kipusalud_inca_theme_homepage/ — exportaciones HTML de las vistas del proyecto KipuSalud",
+        "source": "user"
+      },
+      "depends_on": null,
+      "type": "text",
+      "options": []
+    },
+    {
+      "id": "F4",
+      "kit": "frontend",
+      "field": "visual.design_system",
+      "title": "Sistema visual",
+      "question": "¿Confirmas conservar el tema quipu peruano ya implementado y los tokens/estilos actuales como sistema visual base?",
+      "importance": "required",
+      "impact": 4,
+      "recommended": null,
+      "default": "match existing pixel-by-pixel using extracted CSS custom properties",
+      "prefilled": true,
+      "prefilled_value": "Mantener el tema quipu peruano existente y sus estilos en frontend/src/styles.scss; integrar las exportaciones Stitch sin alterarlas",
+      "answer": {
+        "value": "Mantener el tema quipu peruano existente y sus estilos en frontend/src/styles.scss; integrar las exportaciones Stitch sin alterarlas",
+        "source": "user"
+      },
+      "depends_on": null,
+      "type": "text",
+      "options": []
+    },
+    {
+      "id": "F5",
+      "kit": "frontend",
+      "field": "compliance.accessibility",
+      "title": "Accesibilidad",
+      "question": "¿Qué estándar de accesibilidad debe cumplir la interfaz?",
+      "importance": "recommended",
+      "impact": 3,
+      "recommended": "WCAG 2.1 AA",
+      "default": "WCAG 2.1 AA",
+      "prefilled": false,
+      "prefilled_value": null,
+      "answer": {
+        "value": "WCAG 2.1 AA",
+        "source": "user"
+      },
+      "depends_on": null,
+      "options": [
+        {
+          "value": "WCAG 2.1 AA",
+          "label": "WCAG 2.1 AA"
+        },
+        {
+          "value": "WCAG 2.2 AA",
+          "label": "WCAG 2.2 AA"
+        },
+        {
+          "value": "Sin requisito formal",
+          "label": "Sin requisito formal adicional"
+        }
+      ],
+      "allow_other": true,
+      "type": "single_select"
+    },
+    {
+      "id": "F6",
+      "kit": "frontend",
+      "field": "compatibility.browsers",
+      "title": "Navegadores compatibles",
+      "question": "¿Qué navegadores se deben soportar?",
+      "importance": "recommended",
+      "impact": 2,
+      "recommended": "Navegadores evergreen actuales",
+      "default": "modern evergreen (Chrome, Firefox, Safari, Edge — latest 2 major versions)",
+      "prefilled": false,
+      "prefilled_value": null,
+      "answer": {
+        "value": "modern evergreen (Chrome, Firefox, Safari, Edge — latest 2 major versions)",
+        "source": "user"
+      },
+      "depends_on": null,
+      "options": [
+        {
+          "value": "Navegadores evergreen actuales",
+          "label": "Chrome, Firefox, Safari y Edge; últimas dos versiones principales"
+        },
+        {
+          "value": "Lista personalizada",
+          "label": "Lista personalizada"
+        }
+      ],
+      "allow_other": true,
+      "type": "single_select"
+    },
+    {
+      "id": "F7",
+      "kit": "frontend",
+      "field": "responsive.breakpoints",
+      "title": "Diseño adaptable",
+      "question": "¿Qué estrategia de diseño adaptable prefieres para los flujos operativos y públicos?",
+      "importance": "recommended",
+      "impact": 3,
+      "recommended": "Mobile-first y conservar patrones actuales",
+      "default": "mobile-first using existing breakpoints detected from codebase",
+      "prefilled": true,
+      "prefilled_value": "Mobile-first; reutilizar el comportamiento adaptable implementado actualmente",
+      "answer": {
+        "value": "Mobile-first; reutilizar el comportamiento adaptable implementado actualmente",
+        "source": "user"
+      },
+      "depends_on": null,
+      "options": [
+        {
+          "value": "Mobile-first y conservar patrones actuales",
+          "label": "Mobile-first y conservar breakpoints/patrones existentes"
+        },
+        {
+          "value": "Solo escritorio",
+          "label": "Solo escritorio"
+        },
+        {
+          "value": "Breakpoints definidos",
+          "label": "Usar breakpoints personalizados"
+        }
+      ],
+      "allow_other": true,
+      "type": "single_select"
+    },
+    {
+      "id": "F8",
+      "kit": "frontend",
+      "field": "i18n.locales",
+      "title": "Idiomas",
+      "question": "¿Qué idiomas y formatos regionales deben incluirse?",
+      "importance": "optional",
+      "impact": 2,
+      "recommended": "Español de Perú",
+      "default": "preserve current locales; keep existing i18n library if present",
+      "prefilled": true,
+      "prefilled_value": "Interfaz en español; usar formatos locales del Perú cuando aplique",
+      "answer": {
+        "value": "Interfaz en español; usar formatos locales del Perú cuando aplique",
+        "source": "user"
+      },
+      "depends_on": null,
+      "options": [
+        {
+          "value": "Español de Perú",
+          "label": "Español (Perú), PEN y formatos locales"
+        },
+        {
+          "value": "Español e inglés",
+          "label": "Español (Perú) e inglés"
+        }
+      ],
+      "allow_other": true,
+      "type": "single_select"
+    },
+    {
+      "id": "F9",
+      "kit": "frontend",
+      "field": "state_mgmt.preference",
+      "title": "Estado del frontend",
+      "question": "¿Confirmas conservar el manejo de estado actual con señales Angular/RxJS y servicios HTTP?",
+      "importance": "optional",
+      "impact": 2,
+      "recommended": "Conservar Angular signals/RxJS",
+      "default": "preserve existing pattern if identifiable; otherwise recommend minimal (component state + server-state library)",
+      "prefilled": true,
+      "prefilled_value": "Conservar el patrón actual de signals, RxJS y servicios Angular",
+      "answer": {
+        "value": "Conservar el patrón actual de signals, RxJS y servicios Angular",
+        "source": "user"
+      },
+      "depends_on": null,
+      "options": [
+        {
+          "value": "Conservar Angular signals/RxJS",
+          "label": "Conservar el patrón actual de Angular signals/RxJS"
+        },
+        {
+          "value": "Introducir NgRx",
+          "label": "Introducir NgRx"
+        }
+      ],
+      "allow_other": true,
+      "type": "single_select"
+    },
+    {
+      "id": "F10",
+      "kit": "frontend",
+      "field": "routing.preference",
+      "title": "Enrutamiento",
+      "question": "¿Confirmas mantener Angular Router y las rutas actuales, incorporando rutas/guards para los nuevos flujos?",
+      "importance": "optional",
+      "impact": 2,
+      "recommended": "Angular Router existente",
+      "default": "use the de-facto router for the chosen target framework",
+      "prefilled": true,
+      "prefilled_value": "Angular Router, preservando las rutas existentes cuando sea compatible",
+      "answer": {
+        "value": "Angular Router, preservando las rutas existentes cuando sea compatible",
+        "source": "user"
+      },
+      "depends_on": null,
+      "options": [
+        {
+          "value": "Angular Router existente",
+          "label": "Angular Router existente"
+        },
+        {
+          "value": "Replantear rutas",
+          "label": "Permitir rediseñar contratos de rutas"
+        }
+      ],
+      "allow_other": true,
+      "type": "single_select"
+    },
+    {
+      "id": "B1",
+      "kit": "backend",
+      "field": "target.framework",
+      "title": "Framework backend",
+      "question": "¿Confirmas mantener Spring Boot 3.2.3 y Java 17 en los microservicios?",
+      "importance": "required",
+      "impact": 5,
+      "recommended": "Spring Boot 3.2.3 y Java 17",
+      "default": null,
+      "prefilled": true,
+      "prefilled_value": "Spring Boot 3.2.3 y Java 17",
+      "answer": {
+        "value": "Spring Boot 3.2.3 y Java 17",
+        "source": "user"
+      },
+      "depends_on": null,
+      "options": [
+        {
+          "value": "Spring Boot 3.2.3 y Java 17",
+          "label": "Spring Boot 3.2.3 y Java 17 (actuales)"
+        },
+        {
+          "value": "Otro",
+          "label": "Otro framework/versión"
+        }
+      ],
+      "allow_other": true,
+      "type": "single_select"
+    },
+    {
+      "id": "B2",
+      "kit": "backend",
+      "field": "api.contract_preservation",
+      "title": "Compatibilidad de APIs",
+      "question": "¿Qué política aplicamos a los endpoints ya consumidos por Angular y los nuevos flujos?",
+      "importance": "required",
+      "impact": 5,
+      "recommended": "can break with versioning",
+      "default": "must preserve",
+      "prefilled": true,
+      "prefilled_value": "Permitir cambiar endpoints según la solicitud previa; versionar los cambios incompatibles y mantener compatibilidad donde sea práctico",
+      "answer": {
+        "value": "can break",
+        "source": "user"
+      },
+      "depends_on": null,
+      "options": [
+        {
+          "value": "must preserve",
+          "label": "Preservar rutas y contratos existentes"
+        },
+        {
+          "value": "can break with versioning",
+          "label": "Permitir cambios incompatibles con versionado y transición"
+        },
+        {
+          "value": "can break",
+          "label": "Rediseñar contratos; no hay clientes que preservar"
+        }
+      ],
+      "allow_other": true,
+      "type": "single_select"
+    },
+    {
+      "id": "B3",
+      "kit": "backend",
+      "field": "data.migration_strategy",
+      "title": "Migraciones de datos",
+      "question": "¿Confirmas migrar la base PostgreSQL existente en el sitio mediante migraciones Flyway versionadas, sin borrar datos ni volúmenes?",
+      "importance": "required",
+      "impact": 5,
+      "recommended": "in-place",
+      "default": "TBD / assess in research phase",
+      "prefilled": true,
+      "prefilled_value": "PostgreSQL con Flyway en el esquema existente; preservar datos existentes y añadir migraciones versionadas",
+      "answer": {
+        "value": "new schema",
+        "source": "user"
+      },
+      "depends_on": null,
+      "options": [
+        {
+          "value": "in-place",
+          "label": "Migraciones PostgreSQL/Flyway in-place, con respaldo y compatibilidad hacia atrás"
+        },
+        {
+          "value": "dual-write",
+          "label": "Esquema paralelo y sincronización temporal"
+        },
+        {
+          "value": "new schema",
+          "label": "Esquema nuevo y migración de datos"
+        },
+        {
+          "value": "no migration",
+          "label": "No modificar la base de datos"
+        }
+      ],
+      "allow_other": true,
+      "type": "single_select"
+    },
+    {
+      "id": "B4",
+      "kit": "backend",
+      "field": "auth.framework",
+      "title": "Autenticación y permisos",
+      "question": "¿Confirmas conservar JWT y reforzar la autorización server-side por rol y farmacia, manteniendo los roles del catálogo (administrador principal, gerente, empleado y operador separado)?",
+      "importance": "recommended",
+      "impact": 5,
+      "recommended": "JWT existente y autorización por rol/tenant",
+      "default": "preserve existing auth mechanism; detect from codebase",
+      "prefilled": true,
+      "prefilled_value": "JWT existente; farmacia identificada en la identidad autenticada; permisos backend explícitos. Mantener roles propuestos en el documento",
+      "answer": {
+        "value": "JWT existente y autorización por rol/tenant",
+        "source": "user"
+      },
+      "depends_on": null,
+      "options": [
+        {
+          "value": "JWT existente y autorización por rol/tenant",
+          "label": "Conservar JWT y reforzar roles/scopes por farmacia en cada API"
+        },
+        {
+          "value": "Adoptar proveedor OIDC",
+          "label": "Migrar a un proveedor OpenID Connect"
+        }
+      ],
+      "allow_other": true,
+      "type": "single_select"
+    },
+    {
+      "id": "B5",
+      "kit": "backend",
+      "field": "nfr.sla",
+      "title": "Objetivos de servicio",
+      "question": "¿Hay objetivos medibles de disponibilidad, latencia o volumen para producción?",
+      "importance": "recommended",
+      "impact": 4,
+      "recommended": null,
+      "default": "match current production baseline; no regression",
+      "prefilled": false,
+      "prefilled_value": null,
+      "answer": {
+        "value": "Reducir en un 70% el tiempo promedio empleado en el registro de ingresos de mercadería y actualización de Kardex, al cabo de 4 semanas de implementado el sistema.\n\nIncrementar en un 70 % la atención de los trabajadores ante los medicamentos que están por vencer mediante el sistema de alertas, evitando posibles pérdidas por falta de atención oportuna, tras dos meses de implementación.\n\nReducir en un 90% el índice de discrepancia de inventario (variación entre el stock físico y el stock lógico) al finalizar el segundo mes de implementación.\n\n(Esto es parte del informe del proyecto adjuntado numerosas veces en este chat, revisa el resto del informe por favor)",
+        "source": "user"
+      },
+      "depends_on": null,
+      "type": "text",
+      "options": []
+    },
+    {
+      "id": "G1",
+      "kit": "generic",
+      "field": "success.definition",
+      "title": "Definición de terminado",
+      "question": "¿Qué evidencia define que la implementación está completa?",
+      "importance": "required",
+      "impact": 5,
+      "recommended": null,
+      "default": "feature parity with the current system; all existing user-facing behaviors preserved",
+      "prefilled": true,
+      "prefilled_value": "Los 15 casos de uso del documento están implementados en UI/API/BD con aislamiento y permisos verificados, integraciones externas no simuladas, migraciones seguras y pruebas automatizadas; frontend y todos los microservicios construyen y los flujos críticos pasan pruebas de integración",
+      "answer": {
+        "value": "Los 15 casos de uso del documento están implementados en UI/API/BD con aislamiento y permisos verificados, integraciones externas no simuladas, migraciones seguras y pruebas automatizadas; frontend y todos los microservicios construyen y los flujos críticos pasan pruebas de integración",
+        "source": "user"
+      },
+      "depends_on": null,
+      "type": "text",
+      "options": []
+    },
+    {
+      "id": "G2",
+      "kit": "generic",
+      "field": "out_of_scope",
+      "title": "Exclusiones explícitas",
+      "question": "¿Qué artefactos o sistemas no debo modificar?",
+      "importance": "recommended",
+      "impact": 3,
+      "recommended": null,
+      "default": "no explicit exclusions; agent will infer from project structure",
+      "prefilled": true,
+      "prefilled_value": "No modificar el informe PDF fuente ni las exportaciones HTML originales de Stitch. No afirmar que existe procesamiento de pagos externo hasta integrar y verificar un proveedor real.",
+      "answer": {
+        "value": "No modificar el informe PDF fuente ni las exportaciones HTML originales de Stitch. No afirmar que existe procesamiento de pagos externo hasta integrar y verificar un proveedor real.",
+        "source": "user"
+      },
+      "depends_on": null,
+      "type": "text",
+      "options": []
+    },
+    {
+      "id": "G3",
+      "kit": "generic",
+      "field": "existing_tests.posture",
+      "title": "Política de pruebas",
+      "question": "¿Qué política se debe aplicar a las pruebas existentes y nuevas?",
+      "importance": "recommended",
+      "impact": 4,
+      "recommended": "must pass + añadir pruebas",
+      "default": "must pass",
+      "prefilled": true,
+      "prefilled_value": "El repositorio no tenía pruebas ejecutables detectadas; agregar pruebas automatizadas por funcionalidad y exigir que las existentes/nuevas pasen",
+      "answer": {
+        "value": "El repositorio no tenía pruebas ejecutables detectadas; agregar pruebas automatizadas por funcionalidad y exigir que las existentes/nuevas pasen",
+        "source": "user"
+      },
+      "depends_on": null,
+      "options": [
+        {
+          "value": "must pass + añadir pruebas",
+          "label": "Mantener todo lo existente en verde y añadir pruebas para las funciones nuevas"
+        },
+        {
+          "value": "can rewrite",
+          "label": "Se pueden reescribir pruebas equivalentes"
+        },
+        {
+          "value": "ignore",
+          "label": "Ignorar las pruebas actuales y crear un set nuevo"
+        }
+      ],
+      "allow_other": true,
+      "type": "single_select"
+    },
+    {
+      "id": "G5",
+      "kit": "generic",
+      "field": "constraints.additional",
+      "title": "Restricciones adicionales",
+      "question": "Indica cualquier requisito comercial, de cumplimiento u operación adicional que deba respetar, en especial valores iniciales/configurables de planes y moneda, renovación, reembolsos, qué ocurre tras el modo de solo lectura, verificación de correo y si la consola del operador KipuSalud va en esta primera versión. Para los pagos, el documento propone no elegir aún una pasarela: puedes confirmar que implementemos solo una interfaz/adaptador y checkout deshabilitado hasta escoger proveedor, o indicar un proveedor real aprobado y sus requisitos.",
+      "importance": "optional",
+      "impact": 5,
+      "recommended": null,
+      "default": "None beyond the decisions listed in this specification.",
+      "prefilled": true,
+      "prefilled_value": "None beyond the decisions listed in this specification.",
+      "answer": {
+        "value": "None beyond the decisions listed in this specification.",
+        "source": "user"
+      },
+      "depends_on": null,
+      "type": "text",
+      "options": []
+    }
+  ]
+}
