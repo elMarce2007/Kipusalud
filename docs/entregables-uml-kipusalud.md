@@ -25,17 +25,36 @@
 
 **Herramienta sugerida:** PlantUML (Use Case Diagram). Copiar el bloque tal cual.
 
+**Organización espacial de los actores:**
+| Posición | Actor | Justificación |
+|----------|-------|---------------|
+| Izquierda superior | Administrador | Gestión del sistema y catálogo maestro |
+| Izquierda inferior | Farmacéutico | Inventario, catálogo clínico y clientes |
+| Derecha superior | Cajero | Operación diaria: POS, ventas, comprobantes |
+| Derecha inferior | Supervisor | Control y auditoría: historial, personal |
+| Abajo (fuera del sistema) | Sistema SUNAT | Actor secundario/externo: integración electrónica |
+
 ```plantuml
 @startuml
 left to right direction
 skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FEFECE
+  BorderColor #A80036
+}
 title KipuSalud - Diagrama General de Casos de Uso
 
-actor "Administrador" as Admin
-actor "Farmacéutico" as Farm
-actor "Cajero" as Caj
-actor "Supervisor" as Sup
-actor "Sistema SUNAT" as SUNAT <<secondary>>
+' ===== ACTORES EN DISTINTAS POSICIONES =====
+together {
+  actor "Administrador" as Admin
+  actor "Farmacéutico" as Farm
+}
+together {
+  actor "Cajero" as Caj
+  actor "Supervisor" as Sup
+}
+actor "Sistema SUNAT" as SUNAT
 
 rectangle "Sistema KipuSalud" {
   usecase "UC01\nIniciar Sesión" as UC01
@@ -52,39 +71,55 @@ rectangle "Sistema KipuSalud" {
   usecase "UC12\nVer Dashboard" as UC12
 }
 
+' --- Administrador: lado IZQUIERDO (superior) ---
 Admin --> UC01
 Admin --> UC02
 Admin --> UC03
-Admin --> UC04
 Admin --> UC05
 Admin --> UC06
 Admin --> UC10
 Admin --> UC12
 
-Farm --> UC01
-Farm --> UC04
-Farm --> UC05
-Farm --> UC06
-Farm --> UC07
-Farm --> UC12
+' --- Farmacéutico: lado IZQUIERDO (inferior) ---
+Farm -right-> UC04
+Farm -right-> UC05
+Farm -right-> UC06
+Farm -right-> UC07
+Farm -right-> UC01
+Farm -right-> UC12
 
-Caj --> UC01
-Caj --> UC04
-Caj --> UC08
-Caj --> UC09
-Caj --> UC11
-Caj --> UC12
+' --- Cajero: lado DERECHO (superior) ---
+Caj -left-> UC01
+Caj -left-> UC04
+Caj -left-> UC08
+Caj -left-> UC09
+Caj -left-> UC11
+Caj -left-> UC12
 
-Sup --> UC01
-Sup --> UC09
-Sup --> UC10
-Sup --> UC12
+' --- Supervisor: lado DERECHO (inferior) ---
+Sup -left-> UC09
+Sup -left-> UC10
+Sup -left-> UC12
+Sup -left-> UC01
 
-SUNAT --> UC11
+' --- SUNAT: parte INFERIOR (actor externo/secundario) ---
+SUNAT -up-> UC11
 
+' --- Relaciones entre casos de uso ---
 UC08 ..> UC11 : <<include>>
 UC08 ..> UC07 : <<include>>\n(valida/descuenta stock)
 UC04 ..> UC08 : <<extend>>\n(selecciona cliente)
+
+' Anclas de posición para el layout
+UC01 -[hidden]down- UC04
+UC04 -[hidden]down- UC07
+UC07 -[hidden]down- UC12
+UC02 -[hidden]down- UC05
+UC05 -[hidden]down- UC08
+UC08 -[hidden]down- UC09
+UC03 -[hidden]down- UC06
+UC06 -[hidden]down- UC10
+UC10 -[hidden]down- UC11
 @enduml
 ```
 
@@ -548,6 +583,10 @@ registrarVenta(): void {
 ---
 
 <a name="anexo-arquitectura"></a>
+## Anexo: Guía de Despliegue en AWS
+
+La guía completa de despliegue en la nube (EC2 + Docker Compose, Route 53, RDS, costos y alternativas ECS/Lightsail) está en el documento separado: [`guia-despliegue-aws.md`](guia-despliegue-aws.md). Úsala para completar la sección C del informe con el enlace de la aplicación desplegada.
+
 ## Anexo: Diagrama de Arquitectura de Microservicios (Mermaid)
 
 ```mermaid
