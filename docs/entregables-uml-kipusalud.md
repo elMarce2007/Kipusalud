@@ -243,6 +243,20 @@ UC10 -[hidden]down- UC11
   4. POST/PUT `/api/personal`.
 - **Capturas a incluir:** lista de personal, formulario de registro de personal.
 
+#### UC12 – Ver Dashboard
+- **Actores:** Administrador, Farmacéutico, Cajero, Supervisor.
+- **Precondición:** Usuario autenticado con token JWT válido (cualquier rol); el módulo de personal solo se consulta para roles ADMINISTRADOR o QF_REGENTE.
+- **Secuencia Básica:**
+  1. El usuario ingresa al módulo del dashboard (`/dashboard`) tras iniciar sesión o seleccionar la opción del menú.
+  2. El sistema muestra las tarjetas de resumen con los contadores de clientes, productos, ventas y personal registrados en la farmacia.
+  3. El frontend ejecuta las peticiones simultáneas GET a `/api/clientes`, `/api/productos`, `/api/ventas` y `/api/personal` mediante el API Gateway.
+  4. El sistema renderiza el gráfico de barras con las ventas mensuales agrupadas por mes (en soles) y el gráfico de stock por producto.
+  5. El usuario puede visualizar el estado general de la operación de la farmacia en tiempo real.
+- **Regla de Negocio:** La tarjeta de personal solo se carga para roles con acceso a información sensible (Administrador / Q.F. Regente); para Cajero y Supervisor este contador se omite sin romper la vista.
+- **Secuencia Alternativa:** Si alguna petición falla (conexión interrumpida o servicio indisponible), el sistema muestra el mensaje de error "No se pudieron cargar los datos. Verifica tu conexión e inténtalo de nuevo." y permanece en la vista sin bloquear la navegación.
+- **Postcondición:** Resumen operativo de la farmacia visualizado; métricas actualizadas al momento de la consulta.
+- **Capturas a incluir:** dashboard con tarjetas de estadísticas, gráfico de ventas mensuales, gráfico de stock por producto, mensaje de error de carga.
+
 ---
 
 <a name="b1-realizacion-de-casos-de-uso"></a>
@@ -305,6 +319,18 @@ Capa datos:    ClienteRepository (JPA -> PostgreSQL clientes_db)
 **RUC07 – Inventario:** Entidad `Producto` con atributos `stock`, `stockMinimo`; operación `AjustarStock(cantidad, motivo)` delegada desde `InventarioController`.
 
 **RUC10 – Personal:** Entidad `Personal` (nombres, documento, cargo, tituloProfesional, numeroColegiatura, sueldo, estado) en `personal-service`, accesible solo con roles autorizados.
+
+**RUC12 – Ver Dashboard (vista de implementación):**
+
+```text
+DashboardComponent (features/dashboard)
+   ├── StatsCardsComponent (widget: contadores clientes/productos/ventas/personal)
+   ├── ChartService.getVentasMensuales() → GET /api/ventas?agrupar=mes (ventas-service)
+   ├── ProductoService.getAll() → GET /api/productos (catalogo-service, gráfico de stock)
+   ├── ClienteService.getAll() / PersonalService.getAll() → peticiones paralelas (forkJoin)
+   ├── RoleGuard: si rol != ADMIN/QF_REGENTE → oculta tarjeta de personal
+   └── Manejo de error → mensaje "No se pudieron cargar los datos..."
+```
 
 ### Participante 4 — Actividad / Estados
 

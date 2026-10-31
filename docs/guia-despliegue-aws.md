@@ -45,13 +45,13 @@ SUNAT_MASTER_KEY=<openssl rand -base64 32>
 SUNAT_ENVIRONMENT=BETA
 ```
 
-### 1.3 Ajustes previos al despliegue
-- El frontend se sirve por nginx en el mapeo `4200 -> 80`; para exponerlo en el
-  puerto estándar, cambiar `"4200:80"` a `"80:80"` en el servicio `frontend`
-  del `docker-compose.yml`, o dejar un reverse proxy (Caddy/nginx) en el host.
-- Los puertos `5433` (Postgres), `8761` (Eureka), `8888` (Config), `15672`
-  (RabbitMQ UI) y `909x` (metrics) **no deben exponerse públicamente** en producción.
-  Restrinirlos solo a `127.0.0.1` (ej.: `"127.0.0.1:8761:8761"`) o cerrarlos en el Security Group.
+### 1.3 Ajustes previos al despliegue ✅ YA APLICADOS EN EL REPOSITORIO
+Los siguientes ajustes ya están hechos en el `docker-compose.yml` actual; verifícalos con `git diff`:
+- El frontend ya expone `"80:80"` (nginx en el puerto estándar del host).
+- Solo quedan expuestos: frontend `80`, api-gateway `8080` y Postgres bindado a
+  `127.0.0.1:5433` (útil para túnel SSH). Eureka/Config/RabbitMQ/UI/metrics ya NO publican puertos.
+- `database.sql` ya está montado en `/docker-entrypoint-initdb.d/99-schema.sql` (§1.4 resuelto).
+- Cada servicio Java ya incluye `JAVA_TOOL_OPTIONS` con límite de RAM (§1.5 resuelto).
 - ✅ **No hace falta tocar las URLs del API**: `environment.prod.ts` ya usa `apiUrl: '/api'`
   (ruta relativa) y `frontend/nginx.conf` hace `proxy_pass http://api-gateway:8080/api/`.
   Con HTTPS detrás de Caddy, todo queda servido desde el mismo origen (sin CORS).
@@ -146,6 +146,8 @@ aws ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port
 # SSH SOLO desde tu IP pública (NO usar 0.0.0.0/0)
 MYIP=$(curl -s ifconfig.me)/32
 aws ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port 22 --cidr $MYIP
+
+echo "SG_ID=$SG_ID"   # anótalo para el paso 3
 ```
 
 ---
@@ -171,10 +173,17 @@ aws ec2 run-instances \
   --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=kipusalud}]'
 ```
 
-### 3.4 Conectarse por SSH
+### 3.4 Obtener la IP pública y conectarse por SSH
 ```bash
-ssh -i ~/.ssh/kipusalud-key.pem ubuntu@<IP-PUBLICA>
+# IP pública de la instancia (reemplaza <i-...> con el Instance ID del paso 3.3)
+IP=$(aws ec2 describe-instances --instance-ids <i-...> \
+     --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+echo $IP
+
+ssh -i ~/.ssh/kipusalud-key.pem ubuntu@$IP
 ```
+> Si `ssh` dice "Permissions too open": `chmod 400 ~/.ssh/kipusalud-key.pem`.
+> Si la conexión se rechaza, verifica que tu IP actual coincida con la que abriste en el SG (§2.4).
 
 ---
 
@@ -198,12 +207,19 @@ docker compose version
 
 ## 5. Desplegar KipuSalud
 
-### 5.1 Obtener el código
+### 5.1 Obtener el código (opción A: repositorio Git)
 ```bash
 git clone <URL-de-tu-repositorio> kipusalud
 cd kipusalud
 ```
-(Si el repo es privado: usar token PAT o copiar con `scp -i ~/.ssh/kipusalud-key.pem -r ./kipusalud ubuntu@<IP>:/home/ubuntu/`)
+
+### 5.1b Obtener el código (opción B: copiar desde tu PC con scp — sin Git)
+Ejecuta esto **desde tu computadora local** (no desde la instancia):
+```bash
+scp -i ~/.ssh/kipusalud-key.pem -r /ruta/local/kipusalud ubuntu@<IP>:/home/ubuntu/kipusalud
+```
+> Tarda varios minutos por los `node_modules`/`target`. Para excluirlos, usa rsync:
+> `rsync -avz --exclude node_modules --exclude target -e "ssh -i ~/.ssh/kipusalud-key.pem" ./kipusalud/ ubuntu@<IP>:~/kipusalud/`
 
 ### 5.2 Crear el archivo .env en el servidor
 Copiar el `.env` local configurado (sección 1.2) al servidor:
@@ -213,8 +229,15 @@ scp -i ~/.ssh/kipusalud-key.pem .env ubuntu@<IP-PUBLICA>:~/kipusalud/.env
 
 ### 5.3 Levantar todo el stack
 ```bash
-docker compose --env-file .env up -d --build
-docker compose ps          # verificar que todos estén "healthy"
+# El .env se aplica automáticamente (compose lee ./​.env); opcional: --env-file .env
+docker compose up -d --build     # tarda 15–30 min la primera vez (compila 12 imágenes)
+docker compose ps                # verificar que todos estén "healthy"
+docker compose logs -f           # seguir el arranque en vivo (Ctrl+C para salir)
+```
+
+⚠️ **Importante:** si el volumen `postgres_data` ya existía de pruebas anteriores, el init SQL no vuelve a ejecutarse. Reinicia limpio:
+```bash
+docker compose down -v && docker compose up -d --build
 ```
 
 Orden interno de arranque (ya resuelto por `depends_on` con healthchecks):
@@ -222,13 +245,23 @@ psql/rabbitmq → discovery → config → services → gateway → frontend.
 
 ### 5.4 Pruebas de humo
 ```bash
-curl -s http://localhost/                     # SPA Angular (si mapeaste 80:80)
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost/   # 200 = SPA Angular OK
 curl -s http://localhost/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"..."}'  # 200 + JWT
+  -d '{"username":"admin","password":"..."}'   # 200 + JWT (login vía gateway)
 docker compose logs --tail=50 api-gateway
+# (si el healthcheck usa wget, revisa: docker inspect --format "{{json .State.Health}}" kipusalud-gateway)
 ```
 Abrir en el navegador: `http://<IP-PUBLICA>` → login KipuSalud.
+
+### 5.5 Solución de problemas frecuentes
+| Síntoma | Causa probable | Corrección |
+|---|---|---|
+| `Schema-validation: missing table` | El init SQL no corrió (volumen viejo) | `docker compose down -v && docker compose up -d` |
+| Servicio muere y reinicia en loop / exit code 137 | OOM (RAM insuficiente) | Baja `MaxRAMPercentage` o usa t3.large; revisa `docker stats` y `sudo dmesg \| grep -i oom` |
+| Gateway `healthy` pero servicios "no registered" | Eureka aún tibio | Esperar 60–90 s tras `up`; revisar `logs discovery-server` |
+| Frontend carga pero `/api` da 502 | Gateway caído | `docker compose logs ventas-service auth-service` |
+| SSH rechazado | Tu IP cambió | Actualiza la regla 22 del SG con tu nueva IP |
 
 ---
 
@@ -320,18 +353,18 @@ Estado tras auditar el repositorio (Oct-2026):
 | # | Elemento | Estado | Acción pendiente |
 |---|---|---|---|
 | 1 | Dockerfiles de los 10 servicios + frontend | ✅ Listos (multi-stage, healthchecks) | Ninguna |
-| 2 | `docker-compose.yml` con orden por healthchecks | ✅ Listo | Cambiar `"4200:80"` → `"80:80"` (o proxy Caddy) |
+| 2 | `docker-compose.yml` con orden por healthchecks | ✅ Listo (+ puertos corregidos) | Ninguna
 | 3 | `.env` productivo | ⚠️ Falta crearlo | `cp .env.example .env` + secretos fuertes (§1.2) |
-| 4 | Esquema de BD automático | ❌ **Bloqueante** | Montar `database.sql` en `/docker-entrypoint-initdb.d/` (§1.4) |
-| 5 | Puertos internos expuestos (8761/8888/5433/15672/909x) | ⚠️ Riesgo | No abrirlos en el Security Group o bind a `127.0.0.1` |
-| 6 | Memoria JVM vs. instancia 4 GB | ⚠️ Riesgo OOM | `JAVA_TOOL_OPTIONS` (§1.5) o usar t3.large |
+| 4 | Esquema de BD automático | ✅ Resuelto | `database.sql` ya montado como `99-schema.sql` (§1.4)
+| 5 | Puertos internos expuestos (8761/8888/5433/15672/909x) | ✅ Resuelto | Solo se publican 80, 8080 y 127.0.0.1:5433; cerrar todo menos 80/443/22 en el SG
+| 6 | Memoria JVM vs. instancia 4 GB | ✅ Mitigado | `JAVA_TOOL_OPTIONS` añadido; aun así vigilar con `docker stats`
 | 7 | URL API del frontend prod | ✅ OK (`/api` relativo + proxy nginx) | Ninguna |
 | 8 | HTTPS/dominio | ⚠️ Opcional pero recomendado | Caddy + Route 53/DuckDNS (§6) |
 | 9 | Contraseña admin semilla (hash BCrypt fijo) | ⚠️ Definir demo | Cambiar hash y documentar credencial (§1.4) |
 | 10 | Repo accesible desde la instancia | ⚠️ Verificar | Subir a GitHub/GitLab o copiar por `scp` (§5.1) |
 | 11 | SUNAT producción | ✅ No necesario | Dejar `SUNAT_ENVIRONMENT=BETA` para la demo |
 
-**Ruta mínima de despliegue:** ítems 3, 4 y 2 son obligatorios; 5, 6 y 8 fuertemente recomendados; el resto es opcional para una entrega académica.
+**Ruta mínima de despliegue:** solo quedan pendientes los ítems 3 (crear `.env` con secretos fuertes), 9 (cambiar hash admin), 10 (subir el repo) y 8 (HTTPS opcional). Los bloqueantes técnicos 2, 4, 5 y 6 ya fueron resueltos en el repositorio.
 
 ---
 
