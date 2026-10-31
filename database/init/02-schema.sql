@@ -309,3 +309,27 @@ INSERT INTO personal (nombres, apellidos, cargo, email) VALUES
 ('Rodrigo',          'Quispe Catacora',    'Técnico en Farmacia',      'rodrigo.quispe@kipusalud.pe'),
 ('Susana',           'Mamani Lazo',        'Cajero',                   'susana.mamani@kipusalud.pe'),
 ('Wilfredo',         'Torres Apaza',       'Almacenero',               'wilfredo.torres@kipusalud.pe');
+-- ============================================================
+-- 6. SOLUCIÓN DE ACCESO — Usuarios de demostración válidos
+--    (los hashes semilla de arriba tienen contraseñas antiguas/descartadas)
+--    Ejecutar este bloque en la BD activa: psql -U postgres -d auth_db < ...
+--    Contraseñas reales documentadas para el informe/demo:
+--      kipusalud_admin / KipuSalud2026!Admin   (ADMINISTRADOR)
+--      kipusalud_qf    / KipuSalud2026!Qf      (QF_REGENTE)
+-- ============================================================
+\connect auth_db
+INSERT INTO farmacias (nombre) VALUES ('Farmacia KipuSalud Demo');
+INSERT INTO usuarios (username, password, rol, farmacia_id, activo)
+VALUES ('kipusalud_admin',
+        '$2a$12$GahNAsoBcywjR2LbUKbDreM1m72Ws2NzErf.nnJqsWgKsGV3aShe2',
+        'ADMINISTRADOR',
+        (SELECT id FROM farmacias WHERE nombre = 'Farmacia KipuSalud Demo'),
+        TRUE)
+ON CONFLICT (username) DO NOTHING;
+INSERT INTO usuarios (username, password, rol, farmacia_id, activo)
+VALUES ('kipusalud_qf',
+        '$2a$12$.SEygTsgEGHlNFwNS/uv4eBqJ0nPtoIn2x//hcQV3ztNwUmE5Ex.G',
+        'QF_REGENTE',
+        (SELECT id FROM farmacias WHERE nombre = 'Farmacia KipuSalud Demo'),
+        TRUE)
+ON CONFLICT (username) DO NOTHING;
