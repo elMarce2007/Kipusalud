@@ -59,6 +59,16 @@ import { AuthService } from '../../../services/auth.service';
 
           <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
             <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Código de farmacia</mat-label>
+              <input matInput formControlName="farmaciaCodigo" autocomplete="organization">
+              <mat-icon matPrefix>qr_code_2</mat-icon>
+              @if (loginForm.get('farmaciaCodigo')?.hasError('required')
+                && loginForm.get('farmaciaCodigo')?.touched) {
+                <mat-error>El código de farmacia es obligatorio</mat-error>
+              }
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
               <mat-label>Nombre de usuario</mat-label>
               <input matInput formControlName="username" autocomplete="username">
               <mat-icon matPrefix>person</mat-icon>
@@ -116,6 +126,7 @@ export class LoginComponent {
   loginError = signal<string | null>(null);
 
   loginForm = this.fb.nonNullable.group({
+    farmaciaCodigo: ['', Validators.required],
     username: ['', Validators.required],
     password: ['', Validators.required]
   });
@@ -133,7 +144,7 @@ export class LoginComponent {
       error: (error: { status?: number }) => {
         this.loading.set(false);
         this.loginError.set(error.status === 401
-          ? 'Usuario o contraseña incorrectos.'
+          ? 'Código de farmacia, usuario o contraseña incorrectos.'
           : 'No se pudo iniciar sesión. Verifica tu conexión e inténtalo de nuevo.');
       }
     });

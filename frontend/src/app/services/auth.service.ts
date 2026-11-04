@@ -29,6 +29,7 @@ export interface ActualizarUsuarioFarmacia {
 export interface Farmacia {
   id: number;
   nombre: string;
+  codigo: string;
 }
 
 const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
@@ -84,6 +85,7 @@ export class AuthService {
             token: response.token,
             farmaciaId: response.farmaciaId,
             farmaciaNombre: response.farmaciaNombre,
+            farmaciaCodigo: response.farmaciaCodigo,
             permisos: response.permisos
           };
           this.storeUser(usuario);
@@ -99,6 +101,7 @@ export class AuthService {
         token: response.token,
         farmaciaId: response.farmaciaId,
         farmaciaNombre: response.farmaciaNombre,
+        farmaciaCodigo: response.farmaciaCodigo,
         permisos: response.permisos
       })));
   }
@@ -123,7 +126,11 @@ export class AuthService {
     return this.http.put<Farmacia>(`${this.apiUrl}/farmacia`, { nombre }).pipe(
       tap(farmacia => {
         const current = this.usuarioSignal();
-        if (current) this.storeUser({ ...current, farmaciaNombre: farmacia.nombre });
+        if (current) this.storeUser({
+          ...current,
+          farmaciaNombre: farmacia.nombre,
+          farmaciaCodigo: farmacia.codigo
+        });
       })
     );
   }

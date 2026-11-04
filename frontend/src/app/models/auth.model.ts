@@ -1,4 +1,5 @@
 export interface LoginRequest {
+  farmaciaCodigo: string;
   username: string;
   password: string;
 }
@@ -9,6 +10,7 @@ export interface LoginResponse {
   rol: string;
   farmaciaId: number;
   farmaciaNombre: string;
+  farmaciaCodigo: string;
   permisos: string[];
 }
 
@@ -24,5 +26,6 @@ export interface Usuario {
   token: string;
   farmaciaId: number;
   farmaciaNombre: string;
+  farmaciaCodigo?: string;
   permisos?: string[];
 }

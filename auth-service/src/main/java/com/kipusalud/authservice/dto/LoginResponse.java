@@ -8,6 +8,7 @@ public record LoginResponse(
         String rol,
         Long farmaciaId,
         String farmaciaNombre,
+        String farmaciaCodigo,
         Set<String> permisos
 ) {
 }

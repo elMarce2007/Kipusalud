@@ -45,16 +45,23 @@ public class AuthService {
     }
 
     public LoginResponse login(LoginRequest request) {
+        String codigo = request.farmaciaCodigo() == null ? "" : request.farmaciaCodigo().trim();
+        Farmacia farmacia = farmaciaRepository.findByCodigoIgnoreCase(codigo)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Código de farmacia, usuario o contraseña incorrectos"));
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.username(), request.password())
         );
         Usuario usuario = usuarioRepository.findByUsername(request.username())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Código de farmacia, usuario o contraseña incorrectos"));
+        if (!farmacia.getId().equals(usuario.getFarmaciaId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED, "Código de farmacia, usuario o contraseña incorrectos");
+        }
         if (!usuario.isActivo()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "La cuenta está desactivada");
         }
-        Farmacia farmacia = farmaciaRepository.findById(usuario.getFarmaciaId())
-                .orElseThrow(() -> new IllegalStateException("La cuenta no tiene una farmacia válida"));
         return loginResponse(usuario, farmacia);
     }
 
@@ -143,7 +150,7 @@ public class AuthService {
     public FarmaciaDto obtenerFarmacia() {
         Farmacia farmacia = farmaciaRepository.findById(TenantContext.requireFarmaciaId())
                 .orElseThrow(() -> new IllegalStateException("La cuenta no tiene una farmacia válida"));
-        return new FarmaciaDto(farmacia.getId(), farmacia.getNombre());
+        return new FarmaciaDto(farmacia.getId(), farmacia.getNombre(), farmacia.getCodigo());
     }
 
     public FarmaciaDto actualizarFarmacia(ActualizarFarmaciaRequest request) {
@@ -156,7 +163,7 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalStateException("La cuenta no tiene una farmacia válida"));
         farmacia.setNombre(nombre.trim());
         Farmacia saved = farmaciaRepository.save(farmacia);
-        return new FarmaciaDto(saved.getId(), saved.getNombre());
+        return new FarmaciaDto(saved.getId(), saved.getNombre(), saved.getCodigo());
     }
 
     private void validarCuenta(String username, String password) {
@@ -175,7 +182,7 @@ public class AuthService {
         String token = jwtUtil.generateToken(
                 usuario.getUsername(), usuario.getRol(), farmacia.getId(), permissions);
         return new LoginResponse(token, usuario.getUsername(), usuario.getRol(),
-                farmacia.getId(), farmacia.getNombre(), permissions);
+                farmacia.getId(), farmacia.getNombre(), farmacia.getCodigo(), permissions);
     }
 
     private UsuarioDto toUsuarioDto(Usuario usuario) {

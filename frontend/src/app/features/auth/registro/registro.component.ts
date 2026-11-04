@@ -7,7 +7,6 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '../../../services/auth.service';
 
 @Component({
@@ -58,51 +57,65 @@ import { AuthService } from '../../../services/auth.service';
             </div>
           }
 
-          <form [formGroup]="registroForm" (ngSubmit)="onSubmit()">
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Nombre de la farmacia</mat-label>
-              <input matInput formControlName="farmaciaNombre" autocomplete="organization">
-              <mat-icon matPrefix>local_pharmacy</mat-icon>
-            </mat-form-field>
+          @if (farmaciaCodigoCreado()) {
+            <div class="codigo-creado" role="status">
+              <h3>Farmacia creada</h3>
+              <p>Guarda y comparte este código con el personal de tu farmacia. Lo necesitarán para iniciar sesión.</p>
+              <strong>{{ farmaciaCodigoCreado() }}</strong>
+              <button mat-raised-button color="primary" type="button"
+                      class="full-width" (click)="irAAdministracion()">
+                Ir a administración
+              </button>
+            </div>
+          } @else {
+            <form [formGroup]="registroForm" (ngSubmit)="onSubmit()">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Nombre de la farmacia</mat-label>
+                <input matInput formControlName="farmaciaNombre" autocomplete="organization">
+                <mat-icon matPrefix>local_pharmacy</mat-icon>
+              </mat-form-field>
 
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Usuario administrador</mat-label>
-              <input matInput formControlName="username" autocomplete="username">
-              <mat-icon matPrefix>person</mat-icon>
-              @if (registroForm.get('username')?.hasError('required') && registroForm.get('username')?.touched) {
-                <mat-error>El usuario es obligatorio</mat-error>
-              }
-            </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Usuario administrador</mat-label>
+                <input matInput formControlName="username" autocomplete="username">
+                <mat-icon matPrefix>person</mat-icon>
+                @if (registroForm.get('username')?.hasError('required') && registroForm.get('username')?.touched) {
+                  <mat-error>El usuario es obligatorio</mat-error>
+                }
+              </mat-form-field>
 
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Contraseña</mat-label>
-              <input matInput type="password" formControlName="password" autocomplete="new-password">
-              <mat-icon matPrefix>lock</mat-icon>
-              @if (registroForm.get('password')?.hasError('required') && registroForm.get('password')?.touched) {
-                <mat-error>La contraseña es obligatoria</mat-error>
-              }
-              @if (registroForm.get('password')?.hasError('minlength') && registroForm.get('password')?.touched) {
-                <mat-error>Usa al menos 12 caracteres</mat-error>
-              }
-            </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Contraseña</mat-label>
+                <input matInput type="password" formControlName="password" autocomplete="new-password">
+                <mat-icon matPrefix>lock</mat-icon>
+                @if (registroForm.get('password')?.hasError('required') && registroForm.get('password')?.touched) {
+                  <mat-error>La contraseña es obligatoria</mat-error>
+                }
+                @if (registroForm.get('password')?.hasError('minlength') && registroForm.get('password')?.touched) {
+                  <mat-error>Usa al menos 12 caracteres</mat-error>
+                }
+              </mat-form-field>
 
-            <button mat-raised-button color="primary"
-                    type="submit"
-                    class="full-width"
-                    [disabled]="loading() || registroForm.invalid">
-              @if (loading()) {
-                <mat-spinner diameter="20"></mat-spinner>
-              } @else {
-                Crear farmacia
-              }
-            </button>
-          </form>
+              <button mat-raised-button color="primary"
+                      type="submit"
+                      class="full-width"
+                      [disabled]="loading() || registroForm.invalid">
+                @if (loading()) {
+                  <mat-spinner diameter="20"></mat-spinner>
+                } @else {
+                  Crear farmacia
+                }
+              </button>
+            </form>
+          }
         </mat-card-content>
 
-        <mat-card-actions>
-          <span>¿Ya tienes una cuenta?</span>
-          <a mat-button routerLink="/auth/login">Iniciar sesión</a>
-        </mat-card-actions>
+        @if (!farmaciaCodigoCreado()) {
+          <mat-card-actions>
+            <span>¿Ya tienes una cuenta?</span>
+            <a mat-button routerLink="/auth/login">Iniciar sesión</a>
+          </mat-card-actions>
+        }
       </mat-card>
     </div>
   `,
@@ -112,10 +125,10 @@ export class RegistroComponent {
   private fb = inject(FormBuilder);
   private authService = inject(AuthService);
   private router = inject(Router);
-  private snackBar = inject(MatSnackBar);
 
   loading = signal(false);
   error = signal<string | null>(null);
+  farmaciaCodigoCreado = signal<string | null>(null);
 
   registroForm = this.fb.nonNullable.group({
     farmaciaNombre: ['', [Validators.required, Validators.maxLength(120)]],
@@ -129,9 +142,9 @@ export class RegistroComponent {
     this.loading.set(true);
     this.error.set(null);
     this.authService.registro(this.registroForm.getRawValue()).subscribe({
-      next: () => {
-        this.snackBar.open('Farmacia y cuenta de administración creadas', 'OK', { duration: 3000 });
-        this.router.navigate(['/administracion']);
+      next: response => {
+        this.farmaciaCodigoCreado.set(response.farmaciaCodigo);
+        this.loading.set(false);
       },
       error: (err: { status?: number }) => {
         this.loading.set(false);
@@ -140,5 +153,9 @@ export class RegistroComponent {
           : 'No se pudo registrar la farmacia. Verifica los datos e inténtalo de nuevo.');
       }
     });
+  }
+
+  irAAdministracion() {
+    this.router.navigate(['/administracion']);
   }
 }

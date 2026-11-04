@@ -1,4 +1,4 @@
 package com.kipusalud.authservice.dto;
 
-public record LoginRequest(String username, String password) {
+public record LoginRequest(String farmaciaCodigo, String username, String password) {
 }

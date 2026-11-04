@@ -149,13 +149,14 @@ UC10 -[hidden]down- UC11
 
 #### UC01 – Iniciar Sesión
 - **Actor:** Administrador / Q.F. regente / Empleado-Cajero / Gerente-Supervisor
-- **Precondición:** Usuario registrado con rol asignado.
+- **Precondición:** Usuario registrado con rol asignado y código de su farmacia.
 - **Secuencia Básica:**
   1. El sistema muestra la pantalla de login (`/auth/login`).
-  2. El usuario ingresa username y contraseña.
+  2. El usuario ingresa el código de farmacia, username y contraseña.
   3. Frontend envía POST `/api/auth/login` al auth-service.
-  4. Se valida credencial (BCrypt) y se genera token JWT con el rol.
-  5. El sistema redirige al Dashboard según el rol.
+  4. El sistema valida las credenciales y que el usuario pertenezca a la farmacia indicada.
+  5. Se genera un token JWT con el rol y el contexto de la farmacia.
+  6. El sistema redirige al Dashboard según el rol.
 - **Extensiones:** Credenciales inválidas → mensaje de error.
 - **Postcondición:** Sesión activa; guardado del token y navegación protegida.
 - **Capturas a incluir:** pantalla de Login, mensaje de error, dashboard posterior.
@@ -167,9 +168,10 @@ UC10 -[hidden]down- UC11
   1. Ingresar a `/auth/registro`.
   2. Completar nombre de farmacia, username y password.
   3. POST `/api/auth/registro`.
-  4. El sistema crea el tenant y su primera cuenta ADMINISTRADOR en una transacción.
-  5. La sesión se inicia y deriva al centro de administración.
-  6. El Administrador puede importar el catálogo inicial en CSV o XLSX; cada fila representa un lote con fecha de vencimiento.
+  4. El sistema crea el tenant, genera un código único de farmacia y crea su primera cuenta ADMINISTRADOR en una transacción.
+  5. La sesión se inicia y muestra el código para que el Administrador lo comparta con el personal.
+  6. El Administrador continúa al centro de administración.
+  7. El Administrador puede importar el catálogo inicial en CSV o XLSX; cada fila representa un lote con fecha de vencimiento.
 - **Reglas de Negocio:** Username único; contraseña de 12 a 72 caracteres cifrada con BCrypt. La importación acepta archivos de hasta 5 MB y 500 filas, valida el archivo completo y no escribe datos si hay errores. Las categorías inexistentes se crean durante la importación.
 - **Capturas a incluir:** formulario de registro, centro de administración, plantilla/importación inicial y confirmación de resultados.
 

@@ -37,6 +37,11 @@ import { AuthService } from '../../services/auth.service';
           </mat-card-subtitle>
         </mat-card-header>
         <mat-card-content>
+          <div class="codigo-farmacia">
+            <span class="codigo-label">Código para iniciar sesión</span>
+            <strong>{{ codigo() || 'Cargando…' }}</strong>
+            <p>Comparte este identificador con el personal de la farmacia. No reemplaza el usuario ni la contraseña.</p>
+          </div>
           @if (error()) {
             <div class="load-error" role="alert">
               <mat-icon>error_outline</mat-icon><span>{{ error() }}</span>
@@ -76,6 +81,10 @@ import { AuthService } from '../../services/auth.service';
     mat-card-header { padding: 20px 20px 0; }
     mat-card-title { font: 500 18px Georgia, "Times New Roman", serif; }
     mat-card-content { padding: 20px; }
+    .codigo-farmacia { display: grid; gap: 8px; margin-bottom: 24px; padding: 16px; background: #f3f5ef; border-radius: 8px; }
+    .codigo-label { color: var(--kipu-muted); font-size: 13px; }
+    .codigo-farmacia strong { font: 600 18px monospace; overflow-wrap: anywhere; }
+    .codigo-farmacia p { margin: 0; color: var(--kipu-muted); }
     .readonly-note { margin: 14px 0 0; color: var(--kipu-muted); }
     .success-message { padding: 12px 16px; background: #e5eee3; color: #315a3d; border-radius: 8px; }
   `
@@ -87,6 +96,7 @@ export class FarmaciaComponent implements OnInit {
 
   error = signal<string | null>(null);
   mensaje = signal<string | null>(null);
+  codigo = signal('');
   saving = signal(false);
   form = this.fb.nonNullable.group({
     nombre: ['', [Validators.required, Validators.maxLength(120)]]
@@ -94,7 +104,10 @@ export class FarmaciaComponent implements OnInit {
 
   ngOnInit() {
     this.authService.obtenerFarmacia().subscribe({
-      next: farmacia => this.form.controls.nombre.setValue(farmacia.nombre),
+      next: farmacia => {
+        this.form.controls.nombre.setValue(farmacia.nombre);
+        this.codigo.set(farmacia.codigo);
+      },
       error: err => {
         console.error('No se pudo cargar la información de la farmacia.', err);
         this.error.set('No se pudo cargar la información de la farmacia.');
