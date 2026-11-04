@@ -6,8 +6,8 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
   const token = authService.getToken();
 
-  // No agregar token a rutas de auth
-  if (req.url.includes('/api/auth')) {
+  // Login and registration are public; user and pharmacy administration require authentication.
+  if (req.url.endsWith('/api/auth/login') || req.url.endsWith('/api/auth/registro')) {
     return next(req);
   }
 
