@@ -1,1 +1,33 @@
 .env
+.env.*
+!.env.example
+
+# Java / Maven
+target/
+**/target/
+
+# Node / Angular
+node_modules/
+frontend/dist/
+frontend/.angular/
+
+# IDE and editor files
+.idea/
+.vscode/
+.metadata/
+.settings/
+**/.settings/
+.classpath
+.project
+.factorypath
+.recommenders/
+.sonarlint/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+_nul
+
+# Logs and temporary files
+*.log
+*.tmp

@@ -8,3 +8,13 @@ export interface Producto {
   categoriaId: number;
   categoriaNombre?: string;
 }
+
+export interface AltaProductoRequest {
+  producto: Producto;
+  ingresoInicial: {
+    referenciaDocumento: string | null;
+    codigoLote: string;
+    fechaVencimiento: string;
+    cantidad: number;
+  } | null;
+}

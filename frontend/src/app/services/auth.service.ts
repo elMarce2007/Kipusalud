@@ -10,12 +10,49 @@ export interface UsuarioFarmacia {
   username: string;
   rol: string;
   activo: boolean;
+  permisos: string[];
 }
 
 export interface CrearUsuarioFarmacia {
   username: string;
   password: string;
+  rol: string;
+  permisos: string[];
 }
+
+export interface ActualizarUsuarioFarmacia {
+  rol: string;
+  activo: boolean;
+  permisos: string[];
+}
+
+export interface Farmacia {
+  id: number;
+  nombre: string;
+}
+
+const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
+  ADMINISTRADOR: [
+    'DASHBOARD:VER', 'CLIENTES:VER', 'CLIENTES:GESTIONAR', 'CATALOGO:VER', 'CATALOGO:GESTIONAR',
+    'INVENTARIO:VER', 'INVENTARIO:GESTIONAR', 'VENTAS:VER', 'VENTAS:GESTIONAR',
+    'PERSONAL:VER', 'PERSONAL:GESTIONAR', 'USUARIOS:VER', 'USUARIOS:GESTIONAR',
+    'FARMACIA:VER', 'FARMACIA:EDITAR'
+  ],
+  GERENTE_SUPERVISOR: [
+    'DASHBOARD:VER', 'CLIENTES:VER', 'CLIENTES:GESTIONAR', 'CATALOGO:VER', 'CATALOGO:GESTIONAR',
+    'INVENTARIO:VER', 'INVENTARIO:GESTIONAR', 'VENTAS:VER', 'VENTAS:GESTIONAR',
+    'PERSONAL:VER', 'PERSONAL:GESTIONAR', 'FARMACIA:VER'
+  ],
+  QF_REGENTE: [
+    'DASHBOARD:VER', 'CLIENTES:VER', 'CLIENTES:GESTIONAR', 'CATALOGO:VER', 'CATALOGO:GESTIONAR',
+    'INVENTARIO:VER', 'INVENTARIO:GESTIONAR', 'VENTAS:VER', 'VENTAS:GESTIONAR',
+    'PERSONAL:VER', 'PERSONAL:GESTIONAR', 'FARMACIA:VER'
+  ],
+  EMPLEADO: [
+    'DASHBOARD:VER', 'CLIENTES:VER', 'CLIENTES:GESTIONAR', 'CATALOGO:VER', 'CATALOGO:GESTIONAR',
+    'INVENTARIO:VER', 'INVENTARIO:GESTIONAR', 'VENTAS:VER', 'VENTAS:GESTIONAR', 'FARMACIA:VER'
+  ]
+};
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -29,6 +66,14 @@ export class AuthService {
   isAuthenticated = computed(() => !!this.usuarioSignal());
   userRole = computed(() => this.usuarioSignal()?.rol ?? '');
 
+  hasPermission(permission: string): boolean {
+    const user = this.usuarioSignal();
+    if (!user) return false;
+    return user.permisos?.includes(permission)
+      ?? ROLE_PERMISSIONS[user.rol]?.includes(permission)
+      ?? false;
+  }
+
   login(credentials: LoginRequest): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`${this.apiUrl}/login`, credentials)
       .pipe(
@@ -38,7 +83,8 @@ export class AuthService {
             rol: response.rol,
             token: response.token,
             farmaciaId: response.farmaciaId,
-            farmaciaNombre: response.farmaciaNombre
+            farmaciaNombre: response.farmaciaNombre,
+            permisos: response.permisos
           };
           this.storeUser(usuario);
         })
@@ -52,7 +98,8 @@ export class AuthService {
         rol: response.rol,
         token: response.token,
         farmaciaId: response.farmaciaId,
-        farmaciaNombre: response.farmaciaNombre
+        farmaciaNombre: response.farmaciaNombre,
+        permisos: response.permisos
       })));
   }
 
@@ -62,6 +109,23 @@ export class AuthService {
 
   crearUsuario(data: CrearUsuarioFarmacia): Observable<UsuarioFarmacia> {
     return this.http.post<UsuarioFarmacia>(`${this.apiUrl}/usuarios`, data);
+  }
+
+  actualizarUsuario(id: number, data: ActualizarUsuarioFarmacia): Observable<UsuarioFarmacia> {
+    return this.http.put<UsuarioFarmacia>(`${this.apiUrl}/usuarios/${id}`, data);
+  }
+
+  obtenerFarmacia(): Observable<Farmacia> {
+    return this.http.get<Farmacia>(`${this.apiUrl}/farmacia`);
+  }
+
+  actualizarFarmacia(nombre: string): Observable<Farmacia> {
+    return this.http.put<Farmacia>(`${this.apiUrl}/farmacia`, { nombre }).pipe(
+      tap(farmacia => {
+        const current = this.usuarioSignal();
+        if (current) this.storeUser({ ...current, farmaciaNombre: farmacia.nombre });
+      })
+    );
   }
 
   logout(): void {
@@ -82,6 +146,10 @@ export class AuthService {
       if (typeof user.token !== 'string' || typeof user.username !== 'string'
           || typeof user.rol !== 'string' || typeof user.farmaciaId !== 'number'
           || typeof user.farmaciaNombre !== 'string') {
+        localStorage.removeItem('usuario');
+        return null;
+      }
+      if (user.permisos !== undefined && !Array.isArray(user.permisos)) {
         localStorage.removeItem('usuario');
         return null;
       }

@@ -1,5 +1,7 @@
 package com.kipusalud.catalogoservice.service;
 import com.kipusalud.catalogoservice.socket.SocketNotificationServer;
+import com.kipusalud.catalogoservice.dto.AltaProductoRequest;
+import com.kipusalud.catalogoservice.dto.IngresoMercaderiaRequest;
 import com.kipusalud.catalogoservice.dto.ProductoDto;
 import com.kipusalud.catalogoservice.entity.Categoria;
 import com.kipusalud.catalogoservice.entity.Producto;
@@ -20,14 +22,17 @@ public class ProductoServiceImpl implements ProductoService {
     private final CategoriaRepository categoriaRepository;
     private final SocketNotificationServer socketNotificationServer;
     private final DomainEventOutbox domainEventOutbox;
+    private final InventarioService inventarioService;
 
     public ProductoServiceImpl(
             ProductoRepository productoRepository, CategoriaRepository categoriaRepository,
-            SocketNotificationServer socketNotificationServer, DomainEventOutbox domainEventOutbox) {
+            SocketNotificationServer socketNotificationServer, DomainEventOutbox domainEventOutbox,
+            InventarioService inventarioService) {
         this.productoRepository = productoRepository;
         this.categoriaRepository = categoriaRepository;
         this.socketNotificationServer = socketNotificationServer;
         this.domainEventOutbox = domainEventOutbox;
+        this.inventarioService = inventarioService;
     }
     @Override
     public List<ProductoDto> listar() {
@@ -44,6 +49,11 @@ public class ProductoServiceImpl implements ProductoService {
     @Override
     @Transactional
     public ProductoDto crear(ProductoDto dto) {
+        if (dto.stock() != null && dto.stock() != 0) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "El stock solo se modifica registrando ingresos por lote y vencimiento");
+        }
         validarConfiguracionTributaria(dto.afectacionIgv(), dto.precioIncluyeIgv());
         if ((dto.afectacionIgv() != null || dto.precioIncluyeIgv() != null)
                 && "EMPLEADO".equals(TenantContext.requireRole())) {
@@ -70,6 +80,36 @@ public class ProductoServiceImpl implements ProductoService {
 
     @Override
     @Transactional
+    public ProductoDto crearConIngreso(AltaProductoRequest request) {
+        if (request == null || request.producto() == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "Se requieren los datos del producto");
+        }
+        ProductoDto datos = request.producto();
+        if (datos.stock() != null && datos.stock() != 0) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "El stock inicial debe registrarse como un lote con fecha de vencimiento");
+        }
+
+        ProductoDto creado = crear(new ProductoDto(
+                null, datos.nombre(), datos.descripcion(), datos.precio(), 0, datos.categoriaId(),
+                datos.afectacionIgv(), datos.precioIncluyeIgv(), datos.stockMinimo()));
+        AltaProductoRequest.IngresoInicial ingreso = request.ingresoInicial();
+        if (ingreso == null) {
+            return creado;
+        }
+
+        inventarioService.registrarIngreso(new IngresoMercaderiaRequest(
+                java.util.UUID.randomUUID().toString(),
+                ingreso.referenciaDocumento(),
+                List.of(new IngresoMercaderiaRequest.LineaIngresoRequest(
+                        creado.id(), ingreso.codigoLote(), ingreso.fechaVencimiento(), ingreso.cantidad()))));
+        return obtener(creado.id());
+    }
+
+    @Override
+    @Transactional
     public ProductoDto actualizar(Long id, ProductoDto dto) {
         Producto producto = productoRepository.findByIdAndFarmaciaId(id, TenantContext.requireFarmaciaId())
                 .orElseThrow(() -> new RuntimeException("Producto no encontrado: " + id));
@@ -82,8 +122,6 @@ public class ProductoServiceImpl implements ProductoService {
         producto.setNombre(dto.nombre());
         producto.setDescripcion(dto.descripcion());
         producto.setPrecio(dto.precio());
-        int stockAnterior = producto.getStock();
-        producto.setStock(dto.stock());
         if (dto.stockMinimo() != null) {
             validarStockMinimo(dto.stockMinimo());
             producto.setStockMinimo(dto.stockMinimo());
@@ -107,7 +145,6 @@ public class ProductoServiceImpl implements ProductoService {
                 "producto:actualizado:" + productoActualizado.getId() + ":" + java.util.UUID.randomUUID(),
                 java.util.Map.of("nombre", productoActualizado.getNombre(), "stock", productoActualizado.getStock(),
                         "stockMinimo", productoActualizado.getStockMinimo()));
-        publicarCambioUmbral(productoActualizado, stockAnterior, productoActualizado.getStock());
 
         socketNotificationServer.notificar(
                 "Producto actualizado: "
@@ -144,7 +181,7 @@ public class ProductoServiceImpl implements ProductoService {
         p.setNombre(dto.nombre());
         p.setDescripcion(dto.descripcion());
         p.setPrecio(dto.precio());
-        p.setStock(dto.stock());
+        p.setStock(0);
         int stockMinimo = dto.stockMinimo() == null ? 0 : dto.stockMinimo();
         validarStockMinimo(stockMinimo);
         p.setStockMinimo(stockMinimo);
@@ -178,17 +215,4 @@ public class ProductoServiceImpl implements ProductoService {
         }
     }
 
-    private void publicarCambioUmbral(Producto producto, int stockAnterior, int stockNuevo) {
-        int minimo = producto.getStockMinimo();
-        if (minimo > 0 && stockAnterior > minimo && stockNuevo <= minimo) {
-            domainEventOutbox.record("inventario.stock_bajo", producto.getId(),
-                    "stock-bajo:" + producto.getId() + ":" + java.util.UUID.randomUUID(),
-                    java.util.Map.of("producto", producto.getNombre(), "stock", stockNuevo,
-                            "stockMinimo", minimo, "prioridad", stockNuevo == 0 ? "ALTA" : "MEDIA"));
-        } else if (minimo > 0 && stockAnterior <= minimo && stockNuevo > minimo) {
-            domainEventOutbox.record("inventario.stock_recuperado", producto.getId(),
-                    "stock-recuperado:" + producto.getId() + ":" + java.util.UUID.randomUUID(),
-                    java.util.Map.of("producto", producto.getNombre(), "stock", stockNuevo, "stockMinimo", minimo));
-        }
-    }
 }

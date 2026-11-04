@@ -9,6 +9,7 @@ export interface LoginResponse {
   rol: string;
   farmaciaId: number;
   farmaciaNombre: string;
+  permisos: string[];
 }
 
 export interface RegistroRequest {
@@ -23,4 +24,5 @@ export interface Usuario {
   token: string;
   farmaciaId: number;
   farmaciaNombre: string;
+  permisos?: string[];
 }

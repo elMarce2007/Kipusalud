@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
+import java.util.Collection;
 
 @Component
 public class JwtUtil {
@@ -23,11 +24,12 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(secret.getBytes());
     }
 
-    public String generateToken(String username, String rol, Long farmaciaId) {
+    public String generateToken(String username, String rol, Long farmaciaId, Collection<String> permisos) {
         return Jwts.builder()
                 .subject(username)
                 .claim("rol", rol)
                 .claim("farmaciaId", farmaciaId)
+                .claim("permisos", permisos)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getKey())

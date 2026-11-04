@@ -1,6 +1,8 @@
 package com.kipusalud.authservice.entity;
 
 import jakarta.persistence.*;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "usuarios")
@@ -25,6 +27,11 @@ public class Usuario {
     @Column(nullable = false)
     private boolean activo = true;
 
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "usuario_permisos", joinColumns = @JoinColumn(name = "usuario_id"))
+    @Column(name = "permiso", nullable = false, length = 50)
+    private Set<String> permisos = new HashSet<>();
+
     public Usuario() {}
 
     public Usuario(Long id, String username, String password, String rol, Long farmaciaId) {
@@ -47,4 +54,8 @@ public class Usuario {
     public void setFarmaciaId(Long farmaciaId) { this.farmaciaId = farmaciaId; }
     public boolean isActivo() { return activo; }
     public void setActivo(boolean activo) { this.activo = activo; }
+    public Set<String> getPermisos() { return permisos; }
+    public void setPermisos(Set<String> permisos) {
+        this.permisos = permisos == null ? new HashSet<>() : new HashSet<>(permisos);
+    }
 }

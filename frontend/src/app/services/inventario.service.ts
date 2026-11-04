@@ -1,6 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 import {
   AlertaInventario,
   IngresoInventarioRequest,
@@ -12,7 +13,7 @@ import {
 @Injectable({ providedIn: 'root' })
 export class InventarioService {
   private http = inject(HttpClient);
-  private readonly apiUrl = 'http://localhost:8080/api/inventario';
+  private readonly apiUrl = `${environment.apiUrl}/inventario`;
 
   listarLotes(productoId: number): Observable<LoteInventario[]> {
     return this.http.get<LoteInventario[]>(

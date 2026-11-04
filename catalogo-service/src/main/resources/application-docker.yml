@@ -7,6 +7,10 @@ jwt:
 spring:
   application:
     name: catalogo-service
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   rabbitmq:
     host: ${RABBITMQ_HOST:rabbitmq}
   datasource:

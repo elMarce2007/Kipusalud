@@ -11,6 +11,7 @@ interface NavItem {
   icon: string;
   route: string;
   roles?: readonly string[];
+  permission?: string;
 }
 
 @Component({
@@ -37,7 +38,8 @@ interface NavItem {
 
     <mat-nav-list>
       @for (item of navItems; track item.route) {
-        @if (!item.roles || item.roles.includes(authService.userRole())) {
+        @if ((!item.roles || item.roles.includes(authService.userRole()))
+          && (!item.permission || authService.hasPermission(item.permission))) {
           <a mat-list-item
              [routerLink]="item.route"
              routerLinkActive="active"
@@ -67,23 +69,15 @@ export class SidenavComponent {
   authService = inject(AuthService);
 
   navItems: NavItem[] = [
-    { label: 'Dashboard', icon: 'dashboard', route: '/dashboard' },
-    { label: 'Clientes', icon: 'people', route: '/clientes' },
-    { label: 'Categorías', icon: 'category', route: '/catalogo/categorias' },
-    { label: 'Productos y stock', icon: 'inventory_2', route: '/catalogo/productos' },
-    { label: 'Ingresos y Kardex', icon: 'receipt_long', route: '/inventario' },
-    { label: 'Ventas y despacho', icon: 'point_of_sale', route: '/ventas' },
-    {
-      label: 'Personal',
-      icon: 'badge',
-      route: '/personal',
-      roles: ['ADMINISTRADOR', 'QF_REGENTE']
-    },
-    {
-      label: 'Usuarios',
-      icon: 'manage_accounts',
-      route: '/usuarios',
-      roles: ['ADMINISTRADOR', 'QF_REGENTE']
-    }
+    { label: 'Dashboard', icon: 'dashboard', route: '/dashboard', permission: 'DASHBOARD:VER' },
+    { label: 'Clientes', icon: 'people', route: '/clientes', permission: 'CLIENTES:VER' },
+    { label: 'Categorías', icon: 'category', route: '/catalogo/categorias', permission: 'CATALOGO:VER' },
+    { label: 'Productos y stock', icon: 'inventory_2', route: '/catalogo/productos', permission: 'CATALOGO:VER' },
+    { label: 'Ingresos y Kardex', icon: 'receipt_long', route: '/inventario', permission: 'INVENTARIO:VER' },
+    { label: 'Ventas y despacho', icon: 'point_of_sale', route: '/ventas', permission: 'VENTAS:VER' },
+    { label: 'Personal', icon: 'badge', route: '/personal', permission: 'PERSONAL:VER' },
+    { label: 'Usuarios', icon: 'manage_accounts', route: '/usuarios', permission: 'USUARIOS:VER' },
+    { label: 'Farmacia', icon: 'local_pharmacy', route: '/farmacia', permission: 'FARMACIA:VER' },
+    { label: 'Administración', icon: 'admin_panel_settings', route: '/administracion', roles: ['ADMINISTRADOR'] }
   ];
 }

@@ -26,70 +26,53 @@ Al final se incluye un anexo con las notas para migrar a ECS Fargate (Opción B)
 ### 1.1 Verificar que los images builds funcionan
 ```bash
 cd kipusalud
-cp .env.example .env        # editar secretos antes de subir
-docker compose build
+cp .env.example .env        # completar secretos antes de arrancar
+docker compose --parallel 1 build
 docker compose up -d
-curl http://localhost:8080/actuator/health   # gateway OK
+curl http://localhost:8080/actuator/health   # gateway accesible solo desde el host
 ```
 
 ### 1.2 Configurar variables de entorno productivas
-Editar `.env` (NUNCA subirlo a Git; ya está en `.gitignore`):
+Editar `.env` (no subirlo a Git; `.env.example` no contiene secretos). Genera secretos
+distintos para cada servicio y entorno:
 ```env
 POSTGRES_USER=kipusalud
-POSTGRES_PASSWORD=<password-fuerte-aleatorio>
+POSTGRES_PASSWORD=<secreto-aleatorio-unico>
 RABBITMQ_USER=kipusalud
-RABBITMQ_PASSWORD=<password-fuerte>
-JWT_SECRET=<openssl rand -base64 48>
+RABBITMQ_PASSWORD=<secreto-aleatorio-unico>
+JWT_SECRET=<salida-de-openssl-rand-base64-48>
 JWT_EXPIRATION=86400000
-SUNAT_MASTER_KEY=<openssl rand -base64 32>
+SUNAT_MASTER_KEY=<salida-de-openssl-rand-base64-32>
 SUNAT_ENVIRONMENT=BETA
 ```
+Genera las claves con `openssl rand -base64 48` y `openssl rand -base64 32`;
+guárdalas en un gestor de secretos o en un `.env` con permisos restringidos.
+No reutilices contraseñas ni claves publicadas previamente. `SUNAT_MASTER_KEY`
+debe conservarse mientras existan credenciales SUNAT cifradas con ella; rotarla
+requiere descifrar y volver a cifrar esos datos.
 
 ### 1.3 Ajustes previos al despliegue ✅ YA APLICADOS EN EL REPOSITORIO
 Los siguientes ajustes ya están hechos en el `docker-compose.yml` actual; verifícalos con `git diff`:
 - El frontend ya expone `"80:80"` (nginx en el puerto estándar del host).
-- Solo quedan expuestos: frontend `80`, api-gateway `8080` y Postgres bindado a
-  `127.0.0.1:5433` (útil para túnel SSH). Eureka/Config/RabbitMQ/UI/metrics ya NO publican puertos.
-- `database.sql` ya está montado en `/docker-entrypoint-initdb.d/99-schema.sql` (§1.4 resuelto).
+- El API Gateway y PostgreSQL se enlazan a `127.0.0.1`; el gateway se consume a
+  través del proxy del frontend y PostgreSQL se puede consultar mediante túnel SSH.
+  Eureka/Config/RabbitMQ/UI/metrics no publican puertos en el host.
 - Cada servicio Java ya incluye `JAVA_TOOL_OPTIONS` con límite de RAM (§1.5 resuelto).
 - ✅ **No hace falta tocar las URLs del API**: `environment.prod.ts` ya usa `apiUrl: '/api'`
   (ruta relativa) y `frontend/nginx.conf` hace `proxy_pass http://api-gateway:8080/api/`.
   Con HTTPS detrás de Caddy, todo queda servido desde el mismo origen (sin CORS).
 
-### 1.4 ⚠️ Bloqueante: inicialización del esquema de Base de Datos
-Los servicios usan `spring.jpa.hibernate.ddl-auto: validate`: **NO crean las tablas**.
-El script `database/init/01-create-databases.sh` solo crea las 6 bases
-(`auth_db, clientes_db, catalogo_db, ventas_db, personal_db, auditoria_db`),
-pero **no ejecuta `database.sql`** (tablas + datos semilla). Sin esto, los contenedores
-fallan al arrancar con `Schema-validation: missing table [...]`.
+### 1.4 Inicialización del esquema de Base de Datos
+`database/init/01-create-databases.sh` crea únicamente las bases vacías
+(`auth_db, clientes_db, catalogo_db, ventas_db, personal_db, auditoria_db`).
+Cada microservicio crea y actualiza sus tablas mediante sus migraciones Flyway al
+arrancar. No importes SQL de esquema o datos de demostración: no corresponde al
+modelo actual y entra en conflicto con Flyway.
 
-Solución recomendada (montar el SQL en el init de Postgres): editar el volumen del
-servicio `psql` en `docker-compose.yml` para añadir el archivo:
-
-```yaml
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./database/init:/docker-entrypoint-initdb.d:ro
-      - ./database.sql:/docker-entrypoint-initdb.d/99-schema.sql:ro
-```
-
-La imagen oficial de Postgres ejecuta automáticamente los `.sh` y `.sql`
-de `/docker-entrypoint-initdb.d/` **solo en el primer arranque** (cuando el volumen
-`postgres_data` está vacío). El orden es alfabético: primero `01-create-databases.sh`
-crea las 6 bases, luego `99-schema.sql` crea tablas y datos semilla.
-Si ya probaste el stack antes, reinicia limpio: `docker compose down -v && docker compose up -d`.
-
-Alternativa manual después de `docker compose up -d psql`:
-```bash
-docker exec -i kipusalud-psql psql -U postgres < database.sql
-```
-
-Además: el usuario admin semilla de `database.sql` tiene contraseña BCrypt hardcodeada;
-cámbiala antes de desplegar generando tu hash:
-```bash
-# ejemplo con bcrypt online o vía auth-service; documentar la contraseña demo en el informe
-htpasswd -bnBC 12 "" 'TU_PASSWORD_DEMO' | tr -d ':\n'
-```
+Las migraciones se ejecutan también cuando `postgres_data` ya existe; no borres
+volúmenes para forzar su ejecución. Antes de cambios de esquema, haz un respaldo
+verificado. Si una migración falla, revisa los logs del servicio y corrige la causa
+sin eliminar ni recrear el volumen de PostgreSQL.
 
 ### 1.5 Recomendado: limitar memoria de la JVM (instancia 4 GB)
 Con 12 contenedores en una t3.medium (4 GB), cada JVM puede consumir ~1.5–2 GB por defecto
@@ -222,22 +205,20 @@ scp -i ~/.ssh/kipusalud-key.pem -r /ruta/local/kipusalud ubuntu@<IP>:/home/ubunt
 > `rsync -avz --exclude node_modules --exclude target -e "ssh -i ~/.ssh/kipusalud-key.pem" ./kipusalud/ ubuntu@<IP>:~/kipusalud/`
 
 ### 5.2 Crear el archivo .env en el servidor
-Copiar el `.env` local configurado (sección 1.2) al servidor:
+Crear el `.env` directamente en el servidor (no versionarlo ni copiarlo al repositorio):
 ```bash
-scp -i ~/.ssh/kipusalud-key.pem .env ubuntu@<IP-PUBLICA>:~/kipusalud/.env
+umask 077
+touch .env
+nano .env
 ```
 
 ### 5.3 Levantar todo el stack
 ```bash
-# El .env se aplica automáticamente (compose lee ./​.env); opcional: --env-file .env
-docker compose up -d --build     # tarda 15–30 min la primera vez (compila 12 imágenes)
+# El .env se aplica automáticamente (compose lee ./.env).
+docker compose --parallel 1 build
+docker compose up -d
 docker compose ps                # verificar que todos estén "healthy"
 docker compose logs -f           # seguir el arranque en vivo (Ctrl+C para salir)
-```
-
-⚠️ **Importante:** si el volumen `postgres_data` ya existía de pruebas anteriores, el init SQL no vuelve a ejecutarse. Reinicia limpio:
-```bash
-docker compose down -v && docker compose up -d --build
 ```
 
 Orden interno de arranque (ya resuelto por `depends_on` con healthchecks):
@@ -248,7 +229,8 @@ psql/rabbitmq → discovery → config → services → gateway → frontend.
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost/   # 200 = SPA Angular OK
 curl -s http://localhost/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"..."}'   # 200 + JWT (login vía gateway)
+  -d '{"username":"<usuario-configurado>","password":"<secreto-configurado>"}' \
+  # 200 + JWT (login vía gateway)
 docker compose logs --tail=50 api-gateway
 # (si el healthcheck usa wget, revisa: docker inspect --format "{{json .State.Health}}" kipusalud-gateway)
 ```
@@ -257,7 +239,7 @@ Abrir en el navegador: `http://<IP-PUBLICA>` → login KipuSalud.
 ### 5.5 Solución de problemas frecuentes
 | Síntoma | Causa probable | Corrección |
 |---|---|---|
-| `Schema-validation: missing table` | El init SQL no corrió (volumen viejo) | `docker compose down -v && docker compose up -d` |
+| `Schema-validation: missing table` | Falló una migración Flyway o se usó un esquema antiguo | Revisar los logs del servicio y la versión Flyway; respaldar antes de reparar, nunca borrar volúmenes con datos |
 | Servicio muere y reinicia en loop / exit code 137 | OOM (RAM insuficiente) | Baja `MaxRAMPercentage` o usa t3.large; revisa `docker stats` y `sudo dmesg \| grep -i oom` |
 | Gateway `healthy` pero servicios "no registered" | Eureka aún tibio | Esperar 60–90 s tras `up`; revisar `logs discovery-server` |
 | Frontend carga pero `/api` da 502 | Gateway caído | `docker compose logs ventas-service auth-service` |
@@ -305,9 +287,11 @@ aws rds create-db-instance \
 ```env
 POSTGRES_HOST=<endpoint-rds>   POSTGRES_PORT=5432
 ```
-3. Ejecutar el script inicial `database.sql` contra RDS:
+3. Crear las seis bases vacías y permitir que las migraciones Flyway de cada servicio
+   creen las tablas al arrancar. No ejecutar esquemas ni credenciales de demostración:
 ```bash
-psql -h <endpoint-rds> -U kipusalud -f database.sql
+# Configura POSTGRES_HOST=<endpoint-rds> y POSTGRES_PORT=5432 en el entorno protegido.
+# Inicia los servicios en el orden de docker-compose.yml para ejecutar Flyway.
 ```
 
 ---
@@ -318,8 +302,8 @@ psql -h <endpoint-rds> -U kipusalud -f database.sql
 |---|---|
 | Ver estado | `docker compose ps` |
 | Logs de un servicio | `docker compose logs -f ventas-service` |
-| Actualizar versión | `git pull && docker compose up -d --build` |
-| Reiniciar stack | `docker compose down && docker compose up -d` |
+| Actualizar versión | `git pull && docker compose --parallel 1 build && docker compose up -d` |
+| Reiniciar stack | `docker compose restart` |
 | Backup BD (contenedor) | `docker exec kipusalud-psql pg_dump -U postgres -d auth_db > backup_auth.sql` |
 | Monitoreo | `docker stats` / CloudWatch Agent (opcional) |
 
@@ -355,16 +339,16 @@ Estado tras auditar el repositorio (Oct-2026):
 | 1 | Dockerfiles de los 10 servicios + frontend | ✅ Listos (multi-stage, healthchecks) | Ninguna |
 | 2 | `docker-compose.yml` con orden por healthchecks | ✅ Listo (+ puertos corregidos) | Ninguna
 | 3 | `.env` productivo | ⚠️ Falta crearlo | `cp .env.example .env` + secretos fuertes (§1.2) |
-| 4 | Esquema de BD automático | ✅ Resuelto | `database.sql` ya montado como `99-schema.sql` (§1.4)
-| 5 | Puertos internos expuestos (8761/8888/5433/15672/909x) | ✅ Resuelto | Solo se publican 80, 8080 y 127.0.0.1:5433; cerrar todo menos 80/443/22 en el SG
+| 4 | Esquema de BD automático | ✅ Resuelto | Las migraciones Flyway de cada servicio crean y actualizan sus tablas (§1.4)
+| 5 | Puertos internos expuestos (8761/8888/5433/15672/909x) | ✅ Resuelto | Solo el frontend se publica en 80; el gateway y PostgreSQL se enlazan a localhost
 | 6 | Memoria JVM vs. instancia 4 GB | ✅ Mitigado | `JAVA_TOOL_OPTIONS` añadido; aun así vigilar con `docker stats`
 | 7 | URL API del frontend prod | ✅ OK (`/api` relativo + proxy nginx) | Ninguna |
 | 8 | HTTPS/dominio | ⚠️ Opcional pero recomendado | Caddy + Route 53/DuckDNS (§6) |
-| 9 | Contraseña admin semilla (hash BCrypt fijo) | ⚠️ Definir demo | Cambiar hash y documentar credencial (§1.4) |
+| 9 | Usuarios de demostración | ✅ Deshabilitados | Crear y usar una cuenta administrativa propia |
 | 10 | Repo accesible desde la instancia | ⚠️ Verificar | Subir a GitHub/GitLab o copiar por `scp` (§5.1) |
 | 11 | SUNAT producción | ✅ No necesario | Dejar `SUNAT_ENVIRONMENT=BETA` para la demo |
 
-**Ruta mínima de despliegue:** solo quedan pendientes los ítems 3 (crear `.env` con secretos fuertes), 9 (cambiar hash admin), 10 (subir el repo) y 8 (HTTPS opcional). Los bloqueantes técnicos 2, 4, 5 y 6 ya fueron resueltos en el repositorio.
+**Ruta mínima de despliegue:** crear `.env` con secretos únicos y protegidos, subir el repo y configurar HTTPS si corresponde. No hay cuentas administrativas con credenciales de demostración; registrar una cuenta propia.
 
 ---
 

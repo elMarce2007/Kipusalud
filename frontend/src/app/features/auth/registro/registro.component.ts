@@ -131,7 +131,7 @@ export class RegistroComponent {
     this.authService.registro(this.registroForm.getRawValue()).subscribe({
       next: () => {
         this.snackBar.open('Farmacia y cuenta de administración creadas', 'OK', { duration: 3000 });
-        this.router.navigate(['/dashboard']);
+        this.router.navigate(['/administracion']);
       },
       error: (err: { status?: number }) => {
         this.loading.set(false);

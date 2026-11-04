@@ -148,7 +148,7 @@ UC10 -[hidden]down- UC11
 ### 👤 Participante 1 — Módulo: Autenticación
 
 #### UC01 – Iniciar Sesión
-- **Actor:** Administrador / Farmacéutico / Cajero / Supervisor
+- **Actor:** Administrador / Q.F. regente / Empleado-Cajero / Gerente-Supervisor
 - **Precondición:** Usuario registrado con rol asignado.
 - **Secuencia Básica:**
   1. El sistema muestra la pantalla de login (`/auth/login`).
@@ -162,21 +162,35 @@ UC10 -[hidden]down- UC11
 
 #### UC02 – Registrar Farmacia
 - **Actor:** Administrador (nuevo cliente SaaS)
-- **Precondición:** No existir cuenta para la razón social ingresada.
+- **Precondición:** No existir una cuenta para el usuario ingresado.
 - **Secuencia Básica:**
   1. Ingresar a `/auth/registro`.
   2. Completar nombre de farmacia, username y password.
   3. POST `/api/auth/registro`.
-  4. El sistema crea el tenant y el usuario ADMIN.
-  5. Muestra éxito y deriva a login.
-- **Reglas de Negocio:** Username único; contraseña mínima 8 caracteres cifrada BCrypt.
-- **Capturas a incluir:** formulario vacío, formulario completado, mensaje de éxito.
+  4. El sistema crea el tenant y su primera cuenta ADMINISTRADOR en una transacción.
+  5. La sesión se inicia y deriva al centro de administración.
+  6. El Administrador puede importar el catálogo inicial en CSV o XLSX; cada fila representa un lote con fecha de vencimiento.
+- **Reglas de Negocio:** Username único; contraseña de 12 a 72 caracteres cifrada con BCrypt. La importación acepta archivos de hasta 5 MB y 500 filas, valida el archivo completo y no escribe datos si hay errores. Las categorías inexistentes se crean durante la importación.
+- **Capturas a incluir:** formulario de registro, centro de administración, plantilla/importación inicial y confirmación de resultados.
+
+#### UC03 – Gestionar Usuarios
+- **Actor:** Administrador; Gerente/Supervisor solo si el Administrador delega la gestión de cuentas.
+- **Precondición:** Farmacia registrada y sesión autenticada.
+- **Secuencia Básica:**
+  1. Ingresar a `/usuarios`.
+  2. Crear una cuenta con identificador, contraseña temporal y perfil.
+  3. Seleccionar Empleado/Cajero, Q.F. regente o Gerente/Supervisor.
+  4. Para Gerente/Supervisor, el Administrador puede delegar edición del nombre de Botica y/o gestión de cuentas de Empleado/Cajero.
+  5. Consultar el estado de las cuentas y activar/desactivar cuentas no administradoras.
+- **Matriz de acceso:** Administrador tiene acceso completo; Gerente/Supervisor opera módulos y Personal, con Botica y Usuarios sujetos a delegaciones; Q.F. regente no accede a Usuarios ni modifica Botica; Empleado/Cajero comparte los módulos operativos del Q.F. pero no accede a Usuarios ni Personal. “Usuario normal” no es un perfil separado de Empleado/Cajero.
+- **Reglas de Negocio:** Los permisos también se validan en los servicios backend. Un gerente delegado solo puede administrar cuentas de Empleado/Cajero. Los cambios de delegación se aplican al siguiente inicio de sesión. Al desactivar una cuenta se bloquean nuevos inicios de sesión, pero los tokens ya emitidos pueden seguir autorizando solicitudes hasta su expiración (máximo 24 horas).
+- **Capturas a incluir:** formulario de creación con perfiles, delegaciones del gerente y estado de cuentas.
 
 ### 👤 Participante 2 — Módulo: Ventas
 
 #### UC08 – Registrar Venta (Punto de Venta)
-- **Actor:** Cajero
-- **Precondición:** Usuario autenticado (rol CAJERO); productos con stock disponible.
+- **Actor:** Empleado/Cajero
+- **Precondición:** Usuario autenticado con permiso para gestionar ventas; productos con stock disponible.
 - **Secuencia Básica:**
   1. Ingresar a `/ventas/nueva`.
   2. Seleccionar cliente (buscador).
@@ -191,7 +205,7 @@ UC10 -[hidden]down- UC11
 - **Capturas a incluir:** pantalla POS con carrito, validación de stock, venta confirmada.
 
 #### UC09 – Consultar Historial de Ventas
-- **Actor:** Cajero, Supervisor
+- **Actor:** Empleado/Cajero, Gerente/Supervisor
 - **Secuencia Básica:**
   1. Ingresar a `/ventas`.
   2. Listar ventas con filtros por fecha.
@@ -201,14 +215,15 @@ UC10 -[hidden]down- UC11
 ### 👤 Participante 3 — Módulo: Catálogo e Inventario
 
 #### UC06 – Gestionar Productos
-- **Actor:** Farmacéutico / Administrador
-- **Precondición:** Existir al menos una categoría registrada.
+- **Actor:** Q.F. regente / Empleado/Cajero autorizado / Administrador
+- **Precondición:** Sesión autenticada; las categorías pueden crearse desde el catálogo o importarse desde el archivo inicial.
 - **Secuencia Básica:**
   1. Ingresar a `/catalogo/productos`.
   2. Listado paginado con buscador.
-  3. "Nuevo producto" → formulario (nombre, categoría, presentación, precios, stock inicial, vencimiento).
-  4. POST `/api/productos`.
-  5. Mensaje de éxito y actualización de tabla. Permite Editar/Eliminar.
+  3. "Nuevo producto" → formulario de producto y, si corresponde, ingreso de un lote inicial con vencimiento.
+  4. POST `/api/productos/alta` registra producto e ingreso inicial en una transacción.
+  5. La edición de producto no altera stock; las entradas posteriores se registran en Inventario.
+  6. Mensaje de éxito y actualización de tabla. Permite editar/eliminar según las reglas del módulo.
 - **Extensiones:** Datos incompletos → validaciones reactivas impiden envío.
 - **Capturas a incluir:** lista de productos, modal/formulario nuevo, producto editado.
 
@@ -235,7 +250,7 @@ UC10 -[hidden]down- UC11
 - **Capturas a incluir:** lista de clientes, formulario de registro, ficha clínica.
 
 #### UC10 – Gestionar Personal
-- **Actor:** Administrador / Supervisor
+- **Actor:** Administrador / Gerente/Supervisor
 - **Secuencia Básica:**
   1. Ingresar a `/personal`.
   2. Listar personal.
@@ -573,7 +588,7 @@ La programación realizada corresponde exactamente a lo modelado en el punto B.
 | UC10 Personal | `personal-service/.../PersonalController.java` + `features/personal/*` |
 | UC11 Comprobantes | ver `docs/sunat-electronic-invoicing.md` (integración SUNAT) |
 | UC12 Dashboard | `features/dashboard/dashboard.component.ts` + widget `stats-cards` |
-| Infraestructura | Eureka (`discovery-server`), Config Server, API Gateway, PostgreSQL multi-DB (`database.sql`), Docker Compose |
+| Infraestructura | Eureka (`discovery-server`), Config Server, API Gateway, PostgreSQL multi-DB (migraciones Flyway), Docker Compose |
 
 **Fragmento representativo (crear producto — UC06):**
 

@@ -1,5 +1,7 @@
 package com.kipusalud.security;
 
+import java.util.Set;
+
 public final class TenantContext {
 
     private static final ThreadLocal<Identity> IDENTITY = new ThreadLocal<>();
@@ -48,5 +50,9 @@ public final class TenantContext {
         return requireIdentity().role();
     }
 
-    public record Identity(String username, Long farmaciaId, String role) {}
+    public static boolean hasPermission(String permission) {
+        return requireIdentity().permissions().contains(permission);
+    }
+
+    public record Identity(String username, Long farmaciaId, String role, Set<String> permissions) {}
 }

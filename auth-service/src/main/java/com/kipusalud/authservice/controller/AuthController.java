@@ -5,6 +5,9 @@ import com.kipusalud.authservice.dto.LoginResponse;
 import com.kipusalud.authservice.dto.RegistroRequest;
 import com.kipusalud.authservice.dto.CrearUsuarioRequest;
 import com.kipusalud.authservice.dto.UsuarioDto;
+import com.kipusalud.authservice.dto.ActualizarUsuarioRequest;
+import com.kipusalud.authservice.dto.ActualizarFarmaciaRequest;
+import com.kipusalud.authservice.dto.FarmaciaDto;
 import com.kipusalud.authservice.service.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -39,5 +42,21 @@ public class AuthController {
     @PostMapping("/usuarios")
     public ResponseEntity<UsuarioDto> crearEmpleado(@RequestBody CrearUsuarioRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.crearEmpleado(request));
+    }
+
+    @PutMapping("/usuarios/{id}")
+    public ResponseEntity<UsuarioDto> actualizarUsuario(
+            @PathVariable Long id, @RequestBody ActualizarUsuarioRequest request) {
+        return ResponseEntity.ok(authService.actualizarUsuario(id, request));
+    }
+
+    @GetMapping("/farmacia")
+    public ResponseEntity<FarmaciaDto> obtenerFarmacia() {
+        return ResponseEntity.ok(authService.obtenerFarmacia());
+    }
+
+    @PutMapping("/farmacia")
+    public ResponseEntity<FarmaciaDto> actualizarFarmacia(@RequestBody ActualizarFarmaciaRequest request) {
+        return ResponseEntity.ok(authService.actualizarFarmacia(request));
     }
 }

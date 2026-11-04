@@ -13,7 +13,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import javax.crypto.SecretKey;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 final class JwtTenantFilter extends OncePerRequestFilter {
 
@@ -65,12 +68,21 @@ final class JwtTenantFilter extends OncePerRequestFilter {
                 return;
             }
 
-            TenantContext.set(new TenantContext.Identity(username, farmaciaId, role));
+            Set<String> permissions = permissionsFromClaims(claims.get("permisos"), role);
+            TenantContext.set(new TenantContext.Identity(username, farmaciaId, role, permissions));
             TenantContext.setAuthorization(authorization);
-            if (requiresAdministrator(request) && !SetOfRoles.ADMIN_ROLES.contains(role)) {
-                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                objectMapper.writeValue(response.getOutputStream(),
-                        Map.of("error", "El rol no tiene permiso para esta operación"));
+            if (requiresAdministrator(request) && !"ADMINISTRADOR".equals(role)) {
+                forbidden(response);
+                return;
+            }
+            if (requiresAdministratorOrPharmacist(request)
+                    && !SetOfRoles.ADMIN_OR_QF_ROLES.contains(role)) {
+                forbidden(response);
+                return;
+            }
+            String requiredPermission = requiredPermission(request);
+            if (requiredPermission != null && !permissions.contains(requiredPermission)) {
+                forbidden(response);
                 return;
             }
             filterChain.doFilter(request, response);
@@ -82,12 +94,64 @@ final class JwtTenantFilter extends OncePerRequestFilter {
     }
 
     private boolean requiresAdministrator(HttpServletRequest request) {
+        return request.getRequestURI().startsWith("/api/administracion/");
+    }
+
+    private boolean requiresAdministratorOrPharmacist(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return path.startsWith("/api/personal")
-                || path.startsWith("/ws")
-                || path.startsWith("/api/auth/usuarios")
+        return path.startsWith("/ws")
                 || path.matches("/api/ventas/facturacion/configuracion/?")
                 || path.matches("/api/clientes/[^/]+/informacion-clinica/?");
+    }
+
+    private String requiredPermission(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        String method = request.getMethod();
+        if (path.startsWith("/api/auth/usuarios")) {
+            return "GET".equals(method) ? RolePermissions.USUARIOS_VIEW : RolePermissions.USUARIOS_MANAGE;
+        }
+        if (path.startsWith("/api/auth/farmacia")) {
+            return "GET".equals(method) ? RolePermissions.FARMACIA_VIEW : RolePermissions.FARMACIA_EDIT;
+        }
+        String module = null;
+        if (path.startsWith("/api/clientes")) {
+            module = "CLIENTES";
+        } else if (path.startsWith("/api/categorias") || path.startsWith("/api/productos")) {
+            module = "CATALOGO";
+        } else if (path.startsWith("/api/inventario")) {
+            module = "INVENTARIO";
+        } else if (path.startsWith("/api/ventas")) {
+            if (path.matches("/api/ventas/facturacion/configuracion/?")) {
+                return null;
+            }
+            module = "VENTAS";
+        } else if (path.startsWith("/api/personal")) {
+            module = "PERSONAL";
+        }
+        if (module == null) {
+            return null;
+        }
+        return module + (("GET".equals(method) || "HEAD".equals(method))
+                ? ":VER" : ":GESTIONAR");
+    }
+
+    private Set<String> permissionsFromClaims(Object claim, String role) {
+        if (!(claim instanceof Collection<?> values)) {
+            return RolePermissions.effectivePermissions(role, Set.of());
+        }
+        Set<String> additional = new HashSet<>();
+        for (Object value : values) {
+            if (value instanceof String permission && RolePermissions.isKnown(permission)) {
+                additional.add(permission);
+            }
+        }
+        return RolePermissions.effectivePermissions(role, additional);
+    }
+
+    private void forbidden(HttpServletResponse response) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        objectMapper.writeValue(response.getOutputStream(),
+                Map.of("error", "El rol no tiene permiso para esta operación"));
     }
 
     private void unauthorized(HttpServletResponse response) throws IOException {
@@ -97,9 +161,9 @@ final class JwtTenantFilter extends OncePerRequestFilter {
     }
 
     private static final class SetOfRoles {
-        private static final java.util.Set<String> ALLOWED =
-                java.util.Set.of("ADMINISTRADOR", "QF_REGENTE", "EMPLEADO");
-        private static final java.util.Set<String> ADMIN_ROLES =
-                java.util.Set.of("ADMINISTRADOR", "QF_REGENTE");
+        private static final Set<String> ALLOWED =
+                Set.of("ADMINISTRADOR", "GERENTE_SUPERVISOR", "QF_REGENTE", "EMPLEADO");
+        private static final Set<String> ADMIN_OR_QF_ROLES =
+                Set.of("ADMINISTRADOR", "QF_REGENTE");
     }
 }

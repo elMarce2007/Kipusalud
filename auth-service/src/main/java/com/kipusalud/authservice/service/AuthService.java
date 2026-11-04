@@ -10,6 +10,10 @@ import com.kipusalud.authservice.dto.UsuarioDto;
 import com.kipusalud.authservice.repository.FarmaciaRepository;
 import com.kipusalud.authservice.repository.UsuarioRepository;
 import com.kipusalud.authservice.util.JwtUtil;
+import com.kipusalud.authservice.dto.ActualizarFarmaciaRequest;
+import com.kipusalud.authservice.dto.ActualizarUsuarioRequest;
+import com.kipusalud.authservice.dto.FarmaciaDto;
+import com.kipusalud.security.RolePermissions;
 import com.kipusalud.security.TenantContext;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -19,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class AuthService {
@@ -77,12 +82,21 @@ public class AuthService {
     public List<UsuarioDto> listarUsuarios() {
         return usuarioRepository.findAllByFarmaciaIdOrderByUsername(TenantContext.requireFarmaciaId())
                 .stream()
-                .map(usuario -> new UsuarioDto(usuario.getId(), usuario.getUsername(),
-                        usuario.getRol(), usuario.isActivo()))
+                .map(this::toUsuarioDto)
                 .toList();
     }
 
     public UsuarioDto crearEmpleado(CrearUsuarioRequest request) {
+        String rol = request.rol() == null || request.rol().isBlank() ? "EMPLEADO" : request.rol();
+        if (!Set.of("EMPLEADO", "QF_REGENTE", "GERENTE_SUPERVISOR").contains(rol)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El rol solicitado no está permitido");
+        }
+        String callerRole = TenantContext.requireRole();
+        if ("GERENTE_SUPERVISOR".equals(callerRole) && !"EMPLEADO".equals(rol)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "El gerente solo puede crear cuentas de Empleado/Cajero");
+        }
+        Set<String> permisos = validarPermisos(rol, request.permisos());
         validarCuenta(request.username(), request.password());
         Long farmaciaId = TenantContext.requireFarmaciaId();
         if (usuarioRepository.existsByUsername(request.username())) {
@@ -91,10 +105,58 @@ public class AuthService {
         Usuario usuario = new Usuario();
         usuario.setUsername(request.username());
         usuario.setPassword(passwordEncoder.encode(request.password()));
-        usuario.setRol("EMPLEADO");
+        usuario.setRol(rol);
         usuario.setFarmaciaId(farmaciaId);
+        usuario.setPermisos(permisos);
         Usuario saved = usuarioRepository.save(usuario);
-        return new UsuarioDto(saved.getId(), saved.getUsername(), saved.getRol(), saved.isActivo());
+        return toUsuarioDto(saved);
+    }
+
+    public UsuarioDto actualizarUsuario(Long id, ActualizarUsuarioRequest request) {
+        Long farmaciaId = TenantContext.requireFarmaciaId();
+        Usuario usuario = usuarioRepository.findByIdAndFarmaciaId(id, farmaciaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+        if ("ADMINISTRADOR".equals(usuario.getRol())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "La cuenta inicial de administrador no se puede modificar desde esta vista");
+        }
+        String callerRole = TenantContext.requireRole();
+        String role = request.rol();
+        if (role == null || !Set.of("EMPLEADO", "QF_REGENTE", "GERENTE_SUPERVISOR").contains(role)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El rol solicitado no está permitido");
+        }
+        if ("GERENTE_SUPERVISOR".equals(callerRole)
+                && (!"EMPLEADO".equals(usuario.getRol()) || !"EMPLEADO".equals(role))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "El gerente solo puede administrar cuentas de Empleado/Cajero");
+        }
+        if (usuario.getUsername().equals(TenantContext.requireUsername()) && !request.activo()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "No puedes desactivar tu propia cuenta");
+        }
+        usuario.setRol(role);
+        usuario.setActivo(request.activo());
+        usuario.setPermisos(validarPermisos(role, request.permisos()));
+        return toUsuarioDto(usuarioRepository.save(usuario));
+    }
+
+    public FarmaciaDto obtenerFarmacia() {
+        Farmacia farmacia = farmaciaRepository.findById(TenantContext.requireFarmaciaId())
+                .orElseThrow(() -> new IllegalStateException("La cuenta no tiene una farmacia válida"));
+        return new FarmaciaDto(farmacia.getId(), farmacia.getNombre());
+    }
+
+    public FarmaciaDto actualizarFarmacia(ActualizarFarmaciaRequest request) {
+        String nombre = request == null ? null : request.nombre();
+        if (nombre == null || nombre.isBlank() || nombre.trim().length() > 120) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El nombre de la farmacia es obligatorio y debe tener hasta 120 caracteres");
+        }
+        Farmacia farmacia = farmaciaRepository.findById(TenantContext.requireFarmaciaId())
+                .orElseThrow(() -> new IllegalStateException("La cuenta no tiene una farmacia válida"));
+        farmacia.setNombre(nombre.trim());
+        Farmacia saved = farmaciaRepository.save(farmacia);
+        return new FarmaciaDto(saved.getId(), saved.getNombre());
     }
 
     private void validarCuenta(String username, String password) {
@@ -109,8 +171,28 @@ public class AuthService {
     }
 
     private LoginResponse loginResponse(Usuario usuario, Farmacia farmacia) {
-        String token = jwtUtil.generateToken(usuario.getUsername(), usuario.getRol(), farmacia.getId());
+        Set<String> permissions = RolePermissions.effectivePermissions(usuario.getRol(), usuario.getPermisos());
+        String token = jwtUtil.generateToken(
+                usuario.getUsername(), usuario.getRol(), farmacia.getId(), permissions);
         return new LoginResponse(token, usuario.getUsername(), usuario.getRol(),
-                farmacia.getId(), farmacia.getNombre());
+                farmacia.getId(), farmacia.getNombre(), permissions);
+    }
+
+    private UsuarioDto toUsuarioDto(Usuario usuario) {
+        return new UsuarioDto(usuario.getId(), usuario.getUsername(), usuario.getRol(), usuario.isActivo(),
+                RolePermissions.effectivePermissions(usuario.getRol(), usuario.getPermisos()));
+    }
+
+    private Set<String> validarPermisos(String rol, Set<String> permisos) {
+        Set<String> requested = permisos == null ? Set.of() : Set.copyOf(permisos);
+        if (!"GERENTE_SUPERVISOR".equals(rol) && !requested.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Los permisos delegables solo se asignan al rol Gerente/Supervisor");
+        }
+        if (requested.stream().anyMatch(permission -> !RolePermissions.isManagerDelegation(permission))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La delegación contiene un permiso no permitido");
+        }
+        return requested;
     }
 }

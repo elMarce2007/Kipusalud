@@ -1,4 +1,11 @@
 package com.kipusalud.authservice.dto;
 
-public record CrearUsuarioRequest(String username, String password) {
+import java.util.Set;
+
+public record CrearUsuarioRequest(
+        String username,
+        String password,
+        String rol,
+        Set<String> permisos
+) {
 }

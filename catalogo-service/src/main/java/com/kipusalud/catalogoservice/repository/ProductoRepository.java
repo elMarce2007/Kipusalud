@@ -12,6 +12,8 @@ import jakarta.persistence.LockModeType;
 
 public interface ProductoRepository extends JpaRepository<Producto, Long> {
     List<Producto> findAllByFarmaciaIdOrderByNombreAsc(Long farmaciaId);
+    boolean existsByFarmaciaId(Long farmaciaId);
+    long countByFarmaciaId(Long farmaciaId);
     List<Producto> findByCategoriaIdAndFarmaciaId(Long categoriaId, Long farmaciaId);
     Optional<Producto> findByIdAndFarmaciaId(Long id, Long farmaciaId);
     boolean existsByIdAndFarmaciaId(Long id, Long farmaciaId);

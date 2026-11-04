@@ -1,5 +1,6 @@
 package com.kipusalud.catalogoservice.controller;
 
+import com.kipusalud.catalogoservice.dto.AltaProductoRequest;
 import com.kipusalud.catalogoservice.dto.ProductoDto;
 import com.kipusalud.catalogoservice.service.ProductoService;
 import org.springframework.http.HttpStatus;
@@ -31,6 +32,11 @@ public class ProductoController {
     @PostMapping
     public ResponseEntity<ProductoDto> crear(@RequestBody ProductoDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(productoService.crear(dto));
+    }
+
+    @PostMapping("/alta")
+    public ResponseEntity<ProductoDto> crearConIngreso(@RequestBody AltaProductoRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(productoService.crearConIngreso(request));
     }
 
     @PutMapping("/{id}")

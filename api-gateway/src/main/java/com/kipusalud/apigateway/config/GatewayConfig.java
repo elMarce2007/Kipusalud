@@ -42,6 +42,10 @@ public class GatewayConfig {
                         .path("/api/inventario/**")
                         .filters(f -> f.filter(jwtAuthFilter))
                         .uri("lb://catalogo-service"))
+                .route("catalogo-service-administracion", r -> r
+                        .path("/api/administracion/**")
+                        .filters(f -> f.filter(jwtAuthFilter))
+                        .uri("lb://catalogo-service"))
                 .route("ventas-service", r -> r
                         .path("/api/ventas/**")
                         .filters(f -> f.filter(jwtAuthFilter))
