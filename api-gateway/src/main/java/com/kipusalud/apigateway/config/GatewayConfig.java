@@ -1,6 +1,7 @@
 package com.kipusalud.apigateway.config;
 
 import com.kipusalud.apigateway.filter.JwtAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
@@ -15,9 +16,14 @@ import java.util.Arrays;
 public class GatewayConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final String allowedOrigins;
 
-    public GatewayConfig(JwtAuthenticationFilter jwtAuthFilter) {
+    public GatewayConfig(
+            JwtAuthenticationFilter jwtAuthFilter,
+            @Value("${CORS_ALLOWED_ORIGINS:http://localhost:4200,http://127.0.0.1:4200}")
+            String allowedOrigins) {
         this.jwtAuthFilter = jwtAuthFilter;
+        this.allowedOrigins = allowedOrigins;
     }
 
     @Bean
@@ -60,7 +66,10 @@ public class GatewayConfig {
     @Bean
     public CorsWebFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(Arrays.asList("http://localhost:4200", "http://127.0.0.1:4200"));
+        config.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toList());
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(Arrays.asList("*"));
         config.setAllowCredentials(true);
