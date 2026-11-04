@@ -11,12 +11,7 @@ import { MatIconModule } from '@angular/material/icon';
       <header class="site-header">
         <a class="brand" routerLink="/" aria-label="KipuSalud, inicio">
           <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 44 44" fill="none">
-              <path d="M11 7v29M21 7v29M31 7v29" />
-              <path d="M11 15c5 0 5 5 10 5s5-5 10-5M11 27c5 0 5-5 10-5s5 5 10 5" />
-              <circle cx="11" cy="11" r="2.5" /><circle cx="21" cy="24" r="2.5" />
-              <circle cx="31" cy="31" r="2.5" />
-            </svg>
+            <img src="/kipusalud-mark.svg" alt="">
           </span>
           <span class="brand-name">kipu<span>salud</span></span>
         </a>
@@ -120,11 +115,7 @@ import { MatIconModule } from '@angular/material/icon';
       <footer class="site-footer">
         <a class="brand footer-brand" routerLink="/">
           <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 44 44" fill="none">
-              <path d="M11 7v29M21 7v29M31 7v29M11 15c5 0 5 5 10 5s5-5 10-5M11 27c5 0 5-5 10-5s5 5 10 5" />
-              <circle cx="11" cy="11" r="2.5" /><circle cx="21" cy="24" r="2.5" />
-              <circle cx="31" cy="31" r="2.5" />
-            </svg>
+            <img src="/kipusalud-mark.svg" alt="">
           </span>
           <span class="brand-name">kipu<span>salud</span></span>
         </a>
@@ -151,8 +142,7 @@ import { MatIconModule } from '@angular/material/icon';
     }
     .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
     .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; }
-    .brand-mark svg { width: 100%; height: 100%; stroke: var(--coral); stroke-width: 1.8; stroke-linecap: round; }
-    .brand-mark circle { fill: var(--ochre); stroke: none; }
+    .brand-mark img { width: 100%; height: 100%; }
     .brand-name { font-family: Georgia, serif; font-size: 22px; letter-spacing: -.7px; font-weight: 700; }
     .brand-name span { color: var(--coral); font-weight: 400; }
     .main-nav { display: flex; align-items: center; gap: clamp(22px, 4vw, 54px); }
