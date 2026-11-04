@@ -613,6 +613,10 @@ registrarVenta(): void {
 
 La guía completa de despliegue en la nube (EC2 + Docker Compose, Route 53, RDS, costos y alternativas ECS/Lightsail) está en el documento separado: [`guia-despliegue-aws.md`](guia-despliegue-aws.md). Úsala para completar la sección C del informe con el enlace de la aplicación desplegada.
 
+Documentos complementarios:
+- [`troubleshooting-snackbar-conexion.md`](troubleshooting-snackbar-conexion.md) — solución al error de conexión frontend→API en AWS (proxy Nginx `/api`).
+- [`README-resumen-sesion.md`](README-resumen-sesion.md) — bitácora consolidada de entregables, correcciones y estado del despliegue.
+
 ## Anexo: Diagrama de Arquitectura de Microservicios (Mermaid)
 
 ```mermaid
