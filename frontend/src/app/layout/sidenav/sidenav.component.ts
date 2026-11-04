@@ -27,7 +27,7 @@ interface NavItem {
   ],
   template: `
     <div class="sidenav-header">
-      <img class="logo" src="/dashboard-mark.svg" alt="" aria-hidden="true">
+      <mat-icon class="logo">local_pharmacy</mat-icon>
       @if (expanded()) {
         <div class="brand-copy">
           <span class="brand-name">KipuSalud</span>
