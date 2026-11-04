@@ -9,12 +9,12 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"   # solo accesible desde el host (túnel SSH), NO público
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD", "pg_isready", "-h", "localhost", "-U", "postgres", "-d", "postgres"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -27,10 +27,11 @@ services:
     container_name: kipusalud-rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-kipusalud}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-change-me}
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+    # Puertos internos: se accede vía http://rabbitmq:5672 dentro de la red docker
+    expose:
+      - "5672"
+      - "15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -43,7 +44,7 @@ services:
       - kipusalud-network
 
   # ===================
-  # Discovery & Config
+  # Discovery & Config  (solo internos, no exponer a Internet)
   # ===================
   discovery-server:
     build:
@@ -52,8 +53,9 @@ services:
     container_name: kipusalud-discovery
     environment:
       SPRING_PROFILES_ACTIVE: docker
-    ports:
-      - "8761:8761"
+      JAVA_OPTS: -Xms256m -Xmx384m
+    expose:
+      - "8761"
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8761/actuator/health"]
       interval: 10s
@@ -70,8 +72,9 @@ services:
     container_name: kipusalud-config
     environment:
       SPRING_PROFILES_ACTIVE: native,docker
-    ports:
-      - "8888:8888"
+      JAVA_OPTS: -Xms256m -Xmx384m
+    expose:
+      - "8888"
     depends_on:
       discovery-server:
         condition: service_healthy
@@ -85,7 +88,7 @@ services:
       - kipusalud-network
 
   # ===================
-  # API Gateway
+  # API Gateway  (única puerta de entrada HTTP además del frontend)
   # ===================
   api-gateway:
     build:
@@ -95,6 +98,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JAVA_OPTS: -Xms256m -Xmx512m
     ports:
       - "8080:8080"
     depends_on:
@@ -122,7 +126,7 @@ services:
       - kipusalud-network
 
   # ===================
-  # Business Services
+  # Business Services  (puertos internos con 'expose', no públicos)
   # ===================
   auth-service:
     build:
@@ -137,8 +141,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
-    ports:
-      - "8081:8081"
+      JAVA_OPTS: -Xms256m -Xmx384m
+    expose:
+      - "8081"
     depends_on:
       psql:
         condition: service_healthy
@@ -149,7 +154,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 60s
+      start_period: 90s
     networks:
       - kipusalud-network
 
@@ -165,9 +170,9 @@ services:
       POSTGRES_PORT: 5432
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-    ports:
-       - "8082:8082"
-       - "9091:9091"
+      JAVA_OPTS: -Xms256m -Xmx384m
+    expose:
+      - "8082"
     depends_on:
       psql:
         condition: service_healthy
@@ -178,7 +183,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 60s
+      start_period: 90s
     networks:
       - kipusalud-network
 
@@ -197,10 +202,10 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-kipusalud}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-change-me}
-    ports:
-      - "8083:8083"
-      - "9092:9092"
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+      JAVA_OPTS: -Xms256m -Xmx384m
+    expose:
+      - "8083"
     depends_on:
       psql:
         condition: service_healthy
@@ -213,7 +218,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 60s
+      start_period: 90s
     networks:
       - kipusalud-network
 
@@ -232,7 +237,7 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-kipusalud}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-change-me}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
       CATALOGO_SERVICE_URL: http://catalogo-service:8083
       CLIENTE_SERVICE_URL: http://cliente-service:8082
       SUNAT_MASTER_KEY: ${SUNAT_MASTER_KEY:-}
@@ -240,9 +245,9 @@ services:
       SUNAT_BETA_URL: ${SUNAT_BETA_URL:-https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService}
       SUNAT_PRODUCTION_URL: ${SUNAT_PRODUCTION_URL:-}
       SUNAT_PRODUCTION_ENABLED: ${SUNAT_PRODUCTION_ENABLED:-false}
-    ports:
-      - "8084:8084"
-      - "9090:9090"
+      JAVA_OPTS: -Xms256m -Xmx384m
+    expose:
+      - "8084"
     depends_on:
       psql:
         condition: service_healthy
@@ -259,7 +264,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 60s
+      start_period: 90s
     networks:
       - kipusalud-network
 
@@ -278,9 +283,10 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-kipusalud}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-change-me}
-    ports:
-      - "8086:8086"
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+      JAVA_OPTS: -Xms256m -Xmx384m
+    expose:
+      - "8086"
     depends_on:
       psql:
         condition: service_healthy
@@ -293,7 +299,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 60s
+      start_period: 90s
     networks:
       - kipusalud-network
 
@@ -309,9 +315,9 @@ services:
       POSTGRES_PORT: 5432
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-    ports:
-      - "8085:8085"
-      - "9093:9093"
+      JAVA_OPTS: -Xms256m -Xmx384m
+    expose:
+      - "8085"
     depends_on:
       psql:
         condition: service_healthy
@@ -322,12 +328,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 60s
+      start_period: 90s
     networks:
       - kipusalud-network
 
   # ===================
-  # Frontend
+  # Frontend  (expuesto en 80 para acceso directo / detrás de Caddy o ALB)
   # ===================
   frontend:
     build:
@@ -335,7 +341,7 @@ services:
       dockerfile: Dockerfile
     container_name: kipusalud-frontend
     ports:
-      - "4200:80"
+      - "80:80"
     depends_on:
       api-gateway:
         condition: service_healthy
