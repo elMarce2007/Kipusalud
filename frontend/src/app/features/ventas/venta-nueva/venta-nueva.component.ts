@@ -57,7 +57,7 @@ import { DetalleVenta, MetodoPago } from '../../../models/venta.model';
           <mat-card-content>
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Seleccionar Cliente</mat-label>
-              <mat-select [value]="clienteSeleccionado" (selectionChange)="seleccionarCliente($event.value)">
+              <mat-select [value]="clienteSeleccionado()" (selectionChange)="seleccionarCliente($event.value)">
                 @for (cliente of clientes(); track cliente.id) {
                   <mat-option [value]="cliente">
                     {{ cliente.nombres }} {{ cliente.apellidos }} - {{ cliente.dni }}
@@ -211,7 +211,7 @@ export class VentaNuevaComponent implements OnInit {
   productos = signal<Producto[]>([]);
   detalles = signal<DetalleVenta[]>([]);
   loadError = signal<string | null>(null);
-  clienteSeleccionado: Cliente | null = null;
+  clienteSeleccionado = signal<Cliente | null>(null);
   private pendingVentaKey: string | null = null;
   loading = signal(false);
   metodoPago = signal<MetodoPago>('EFECTIVO');
@@ -224,7 +224,7 @@ export class VentaNuevaComponent implements OnInit {
     this.detalles().reduce((sum, d) => sum + d.subtotal, 0)
   );
   vuelto = computed(() => Math.max(0, this.montoRecibido() - this.total()));
-  puedeConfirmar = computed(() => !!this.clienteSeleccionado
+  puedeConfirmar = computed(() => !!this.clienteSeleccionado()
     && this.detalles().length > 0
     && !this.loading()
     && (this.metodoPago() === 'EFECTIVO'
@@ -243,7 +243,7 @@ export class VentaNuevaComponent implements OnInit {
         this.clientes.set(data);
         const clienteId = Number(this.route.snapshot.queryParamMap.get('clienteId'));
         if (Number.isSafeInteger(clienteId) && clienteId > 0) {
-          this.clienteSeleccionado = data.find(cliente => cliente.id === clienteId) ?? null;
+          this.clienteSeleccionado.set(data.find(cliente => cliente.id === clienteId) ?? null);
         }
       },
       error: err => {
@@ -286,7 +286,7 @@ export class VentaNuevaComponent implements OnInit {
   }
 
   seleccionarCliente(cliente: Cliente | null): void {
-    this.clienteSeleccionado = cliente;
+    this.clienteSeleccionado.set(cliente);
     this.pendingVentaKey = null;
   }
 
@@ -314,14 +314,15 @@ export class VentaNuevaComponent implements OnInit {
   }
 
   confirmarVenta() {
-    if (!this.puedeConfirmar() || !this.clienteSeleccionado?.id) return;
+    const cliente = this.clienteSeleccionado();
+    if (!this.puedeConfirmar() || !cliente?.id) return;
 
     this.loading.set(true);
     this.pendingVentaKey ??= crypto.randomUUID();
     const metodoPago = this.metodoPago();
     const venta = {
       claveIdempotencia: this.pendingVentaKey,
-      clienteId: this.clienteSeleccionado.id!,
+      clienteId: cliente.id,
       metodoPago,
       montoRecibido: metodoPago === 'EFECTIVO' ? this.montoRecibido() : this.total(),
       confirmacionManualPago: metodoPago !== 'EFECTIVO' && this.pagoExternoVerificado(),
