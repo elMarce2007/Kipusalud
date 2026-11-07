@@ -18,6 +18,7 @@ import { VentaService } from '../../../services/venta.service';
 import { Cliente } from '../../../models/cliente.model';
 import { Producto } from '../../../models/producto.model';
 import { DetalleVenta, MetodoPago } from '../../../models/venta.model';
+import { createIdempotencyKey } from '../../../core/utils/idempotency-key';
 
 @Component({
   selector: 'app-venta-nueva',
@@ -318,7 +319,7 @@ export class VentaNuevaComponent implements OnInit {
     if (!this.puedeConfirmar() || !cliente?.id) return;
 
     this.loading.set(true);
-    this.pendingVentaKey ??= crypto.randomUUID();
+    this.pendingVentaKey ??= createIdempotencyKey();
     const metodoPago = this.metodoPago();
     const venta = {
       claveIdempotencia: this.pendingVentaKey,
@@ -335,10 +336,24 @@ export class VentaNuevaComponent implements OnInit {
     };
 
     this.ventaService.crear(venta).subscribe({
-      next: () => {
+      next: ventaRegistrada => {
         this.pendingVentaKey = null;
-        this.snackBar.open('Venta registrada. Verifica el stock actualizado.', 'OK', { duration: 4000 });
-        this.router.navigate(['/ventas']);
+        const confirmado = ventaRegistrada.estado === 'CONFIRMADA';
+        this.router.navigate(['/ventas']).then(navegado => {
+          if (!navegado) {
+            console.error('La venta se registró, pero no se pudo abrir Ventas y despacho.');
+            this.snackBar.open('Venta registrada, pero no se pudo abrir Ventas y despacho.', 'Cerrar',
+              { duration: 5000 });
+            return;
+          }
+          this.snackBar.open(
+            confirmado
+              ? 'Venta registrada exitosamente en el Kardex.'
+              : 'Venta registrada, pero sigue pendiente de confirmación en inventario.',
+            'Cerrar',
+            { duration: 5000 }
+          );
+        });
       },
       error: (err: { status?: number }) => {
         console.error('No se pudo registrar la venta.', err);

@@ -15,6 +15,7 @@ import { AlertaInventario, IngresoInventarioRequest, LineaIngresoInventario, Lot
 import { Producto } from '../../models/producto.model';
 import { InventarioService } from '../../services/inventario.service';
 import { ProductoService } from '../../services/producto.service';
+import { createIdempotencyKey } from '../../core/utils/idempotency-key';
 
 @Component({
   selector: 'app-inventario',
@@ -353,7 +354,7 @@ export class InventarioComponent implements OnInit {
       return;
     }
     this.pendingRequest ??= {
-      claveIdempotencia: crypto.randomUUID(),
+      claveIdempotencia: createIdempotencyKey(),
       referenciaDocumento: this.lineForm.controls.referencia.value.trim() || null,
       lineas: this.lineas().map(line => ({ ...line }))
     };
