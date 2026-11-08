@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -25,7 +25,8 @@ import { Producto } from '../../../../models/producto.model';
     MatInputModule,
     MatSelectModule,
     MatButtonModule,
-    MatIconModule
+    MatIconModule,
+    RouterLink
   ],
   template: `
     <div class="form-container">
@@ -53,13 +54,28 @@ import { Producto } from '../../../../models/producto.model';
 
               <mat-form-field appearance="outline">
                 <mat-label>Categoria</mat-label>
-                <mat-select formControlName="categoriaId">
+                <mat-select formControlName="categoriaId" placeholder="Selecciona una categoría"
+                            [disabled]="cargandoCategorias() || !!errorCategorias() || categorias().length === 0">
                   @for (cat of categorias(); track cat.id) {
                     <mat-option [value]="cat.id">{{ cat.nombre }}</mat-option>
                   }
                 </mat-select>
+                @if (errorCategorias()) {
+                  <mat-hint>
+                    No se pudieron cargar las categorías.
+                    <button mat-button type="button" (click)="cargarCategorias()">Reintentar</button>
+                  </mat-hint>
+                } @else if (!cargandoCategorias() && categorias().length === 0) {
+                  <mat-hint>
+                    Aún no hay categorías.
+                    <a routerLink="/catalogo/categorias/nuevo">Crear categoría</a>
+                  </mat-hint>
+                }
                 @if (form.get('categoriaId')?.hasError('required') && form.get('categoriaId')?.touched) {
                   <mat-error>Categoria es requerida</mat-error>
+                }
+                @if (form.get('categoriaId')?.hasError('min') && form.get('categoriaId')?.touched) {
+                  <mat-error>Selecciona una categoría válida</mat-error>
                 }
               </mat-form-field>
 
@@ -183,6 +199,8 @@ export class ProductoFormComponent implements OnInit {
   id = input<string>();
   loading = signal(false);
   categorias = signal<Categoria[]>([]);
+  cargandoCategorias = signal(false);
+  errorCategorias = signal(false);
   stockActual = 0;
   readonly hoy = this.fechaLocal(new Date());
   private readonly validarFechaVencimiento = (control: AbstractControl) =>
@@ -193,7 +211,7 @@ export class ProductoFormComponent implements OnInit {
     descripcion: [''],
     precio: [0, [Validators.required, Validators.min(0.01)]],
     stockMinimo: [0, [Validators.required, Validators.min(0), Validators.max(1_000_000)]],
-    categoriaId: [0 as number, Validators.required],
+    categoriaId: [0, [Validators.required, Validators.min(1)]],
     registrarStockInicial: [true],
     codigoLote: ['', [Validators.required, Validators.maxLength(100)]],
     fechaVencimiento: ['', [Validators.required, this.validarFechaVencimiento]],
@@ -245,8 +263,19 @@ export class ProductoFormComponent implements OnInit {
   }
 
   cargarCategorias() {
-    this.categoriaService.listar().subscribe(data => {
-      this.categorias.set(data);
+    this.cargandoCategorias.set(true);
+    this.errorCategorias.set(false);
+    this.categoriaService.listar().subscribe({
+      next: data => {
+        this.categorias.set(data);
+        this.cargandoCategorias.set(false);
+      },
+      error: error => {
+        console.error('No se pudieron cargar las categorías para el formulario de producto.', error);
+        this.categorias.set([]);
+        this.errorCategorias.set(true);
+        this.cargandoCategorias.set(false);
+      }
     });
   }
 
