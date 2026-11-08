@@ -81,12 +81,12 @@ import { AuthService } from '../../services/auth.service';
     mat-card-header { padding: 20px 20px 0; }
     mat-card-title { font: 500 18px Georgia, "Times New Roman", serif; }
     mat-card-content { padding: 20px; }
-    .codigo-farmacia { display: grid; gap: 8px; margin-bottom: 24px; padding: 16px; background: #f3f5ef; border-radius: 8px; }
+    .codigo-farmacia { display: grid; gap: 8px; margin-bottom: 24px; padding: 16px; background: #f9f3e6; border: 1px solid #e8e2d6; border-radius: 10px; }
     .codigo-label { color: var(--kipu-muted); font-size: 13px; }
     .codigo-farmacia strong { font: 600 18px monospace; overflow-wrap: anywhere; }
     .codigo-farmacia p { margin: 0; color: var(--kipu-muted); }
     .readonly-note { margin: 14px 0 0; color: var(--kipu-muted); }
-    .success-message { padding: 12px 16px; background: #e5eee3; color: #315a3d; border-radius: 8px; }
+    .success-message { padding: 12px 16px; background: #c2edce; color: #294e38; border-radius: 8px; }
   `
 })
 export class FarmaciaComponent implements OnInit {

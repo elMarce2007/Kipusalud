@@ -142,24 +142,25 @@ interface AdminLink {
     mat-card-header { padding: 18px 18px 0; }
     mat-card-content { display: grid; align-content: start; gap: 8px; padding: 14px 18px 20px; }
     mat-card-content p { margin: 0; color: var(--kipu-muted); line-height: 1.55; }
-    .step-number { display: grid; place-items: center; border-radius: 50%; background: #e8eee5; color: #456b53; font-weight: 700; }
+    .step-number { display: grid; place-items: center; border-radius: 50%; background: #c2edce; color: #294e38; font-weight: 700; }
     .file-input { display: none; }
     .file-note, .selected-file { font-size: 12px; }
     .selected-file { display: flex; align-items: center; gap: 6px; overflow-wrap: anywhere; }
     .button-row { display: flex; flex-wrap: wrap; gap: 8px; }
-    .complete-note { color: #456b53 !important; }
+    .complete-note { color: #41664f !important; }
     .role-guide, .use-cases { margin-top: 30px; }
     h2 { font: 500 22px Georgia, "Times New Roman", serif; }
     .role-grid, .link-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-    .role-grid p { margin: 0; padding: 14px; background: #f7f7f2; border-radius: 8px; line-height: 1.55; }
-    .use-case-link { display: flex; align-items: center; gap: 12px; padding: 14px; color: inherit; text-decoration: none; background: #fff; border: 1px solid #e8e8df; border-radius: 9px; }
-    .use-case-link > mat-icon:first-child { color: #54705a; }
+    .role-grid p { margin: 0; padding: 14px; background: #f9f3e6; border: 1px solid #e8e2d6; border-radius: 10px; line-height: 1.55; }
+    .use-case-link { display: flex; align-items: center; gap: 12px; padding: 14px; color: inherit; text-decoration: none; background: #fffdf8; border: 1px solid #e8e2d6; border-radius: 10px; transition: background .2s, border-color .2s, transform .2s; }
+    .use-case-link:hover { background: #f9f3e6; border-color: #dec0ba; transform: translateY(-1px); }
+    .use-case-link > mat-icon:first-child { color: #41664f; }
     .use-case-link span { display: grid; gap: 3px; flex: 1; }
     .use-case-link small { color: var(--kipu-muted); line-height: 1.4; }
     .arrow { color: var(--kipu-muted); }
     .error-message, .success-message { margin-top: 16px; padding: 12px 16px; border-radius: 8px; }
-    .error-message { color: #8e382a; background: #f4e3dc; }
-    .success-message { color: #315a3d; background: #e5eee3; }
+    .error-message { color: #832514; background: #ffdad6; }
+    .success-message { color: #294e38; background: #c2edce; }
     @media (max-width: 950px) { .setup-grid { grid-template-columns: 1fr; } }
     @media (max-width: 650px) { .role-grid, .link-grid { grid-template-columns: 1fr; } }
   `

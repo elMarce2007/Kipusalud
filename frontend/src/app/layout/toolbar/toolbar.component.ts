@@ -17,15 +17,25 @@ import { AuthService } from '../../services/auth.service';
     MatDividerModule
   ],
   template: `
-    <mat-toolbar color="primary" class="toolbar">
+    <mat-toolbar class="toolbar">
       <button mat-icon-button (click)="toggleSidenav.emit()">
         <mat-icon>{{ sidenavOpened() ? 'menu_open' : 'menu' }}</mat-icon>
       </button>
 
+      <div class="toolbar-context">
+        <span class="toolbar-label">Espacio de trabajo</span>
+        <strong>{{ authService.usuario()?.farmaciaNombre || 'KipuSalud' }}</strong>
+      </div>
+
       <span class="spacer"></span>
 
-      <button mat-icon-button [matMenuTriggerFor]="userMenu">
-        <mat-icon>account_circle</mat-icon>
+      <button mat-button class="toolbar-user" [matMenuTriggerFor]="userMenu">
+        <span class="user-avatar" aria-hidden="true">{{ authService.usuario()?.username?.charAt(0)?.toUpperCase() }}</span>
+        <span class="toolbar-user-copy">
+          <strong>{{ authService.usuario()?.username }}</strong>
+          <small>{{ authService.usuario()?.rol }}</small>
+        </span>
+        <mat-icon>expand_more</mat-icon>
       </button>
 
       <mat-menu #userMenu="matMenu">
@@ -36,7 +46,7 @@ import { AuthService } from '../../services/auth.service';
         <mat-divider></mat-divider>
         <button mat-menu-item (click)="authService.logout()">
           <mat-icon>logout</mat-icon>
-          <span>Cerrar sesion</span>
+          <span>Cerrar sesión</span>
         </button>
       </mat-menu>
     </mat-toolbar>

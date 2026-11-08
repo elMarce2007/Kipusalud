@@ -119,8 +119,8 @@ export class DashboardComponent implements OnInit {
     datasets: [{
       data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       label: 'Ventas (S/)',
-      backgroundColor: 'rgba(185, 76, 55, 0.7)',
-      borderColor: 'rgba(185, 76, 55, 1)',
+      backgroundColor: 'rgba(185, 76, 55, 0.68)',
+      borderColor: 'rgba(153, 53, 34, 1)',
       borderWidth: 1
     }]
   };
@@ -130,8 +130,8 @@ export class DashboardComponent implements OnInit {
     datasets: [{
       data: [],
       label: 'Stock',
-      backgroundColor: 'rgba(255, 152, 0, 0.7)',
-      borderColor: 'rgba(255, 152, 0, 1)',
+      backgroundColor: 'rgba(189, 133, 36, 0.65)',
+      borderColor: 'rgba(150, 101, 0, 1)',
       borderWidth: 1
     }]
   };

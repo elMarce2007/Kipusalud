@@ -36,6 +36,9 @@ interface NavItem {
       }
     </div>
 
+    @if (expanded()) {
+      <div class="sidenav-section-label"><span></span> Gestión farmacéutica</div>
+    }
     <mat-nav-list>
       @for (item of navItems; track item.route) {
         @if ((!item.roles || item.roles.includes(authService.userRole()))
@@ -55,8 +58,9 @@ interface NavItem {
     </mat-nav-list>
 
     <div class="sidenav-footer">
-      <button mat-icon-button (click)="toggleExpand.emit()">
+      <button mat-button (click)="toggleExpand.emit()">
         <mat-icon>{{ expanded() ? 'chevron_left' : 'chevron_right' }}</mat-icon>
+        @if (expanded()) { <span>Contraer menú</span> }
       </button>
     </div>
   `,

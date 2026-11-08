@@ -10,208 +10,288 @@ import { MatIconModule } from '@angular/material/icon';
     <div class="landing">
       <header class="site-header">
         <a class="brand" routerLink="/" aria-label="KipuSalud, inicio">
-          <span class="brand-mark" aria-hidden="true">
-            <img src="/kipusalud-mark.svg" alt="">
+          <span class="brand-mark" aria-hidden="true"><img src="/kipusalud-mark.svg" alt=""></span>
+          <span class="brand-copy">
+            <strong>KipuSalud</strong>
+            <small>Gestión logística farmacéutica</small>
           </span>
-          <span class="brand-name">kipu<span>salud</span></span>
         </a>
 
         <nav class="main-nav" aria-label="Navegación principal">
-          <a href="#proposito">Nuestro propósito</a>
+          <a href="#proposito">Propósito</a>
           <a href="#herramientas">Herramientas</a>
+          <a href="#identidad">Identidad</a>
+          <a href="#para-farmacias">Para farmacias</a>
         </nav>
 
-        <a class="header-action" routerLink="/auth/login">
-          Ingresar <mat-icon aria-hidden="true">arrow_forward</mat-icon>
-        </a>
+        <div class="header-actions">
+          <a class="header-login" routerLink="/auth/login">Iniciar sesión</a>
+          <a class="header-cta" routerLink="/auth/registro">Ingresar / Probar</a>
+        </div>
       </header>
 
       <main>
-        <section class="hero" id="proposito">
-          <div class="hero-copy">
-            <p class="eyebrow"><span></span> Gestión farmacéutica con identidad</p>
-            <h1>Cuidar la salud,<br>también es cuidar<br><em>lo que somos.</em></h1>
-            <p class="intro">
-              KipuSalud reúne lo esencial de tu farmacia en un solo lugar.
-              Una forma más clara y humana de cuidar cada detalle.
-            </p>
-            <div class="hero-actions">
-              <a class="button button-primary" routerLink="/auth/login">
-                Conoce KipuSalud <mat-icon aria-hidden="true">arrow_forward</mat-icon>
-              </a>
-              <a class="text-link" href="#herramientas">Explorar herramientas</a>
+        <section class="hero" aria-labelledby="hero-title">
+          <div class="hero-thread" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div class="hero-inner">
+            <div class="hero-copy">
+              <p class="eyebrow"><span></span>Sistema de gestión para boticas independientes</p>
+              <h1 id="hero-title">El orden y cuidado de tu botica, <em>enlazados en un solo lugar.</em></h1>
+              <p class="hero-description">
+                KipuSalud reúne catálogo, existencias por lote, vencimientos, ventas y gestión
+                del equipo en una aplicación web clara y fácil de recorrer.
+              </p>
+              <div class="hero-actions">
+                <a class="button button-primary" routerLink="/auth/login">
+                  Ingresar a la plataforma <mat-icon aria-hidden="true">arrow_forward</mat-icon>
+                </a>
+                <a class="button button-secondary" href="#herramientas">
+                  <mat-icon aria-hidden="true">play_circle</mat-icon> Ver herramientas
+                </a>
+              </div>
+              <div class="hero-highlights" aria-label="Características">
+                <div><strong>Web</strong><span>Acceso desde navegador</span></div>
+                <div><strong>Por lote</strong><span>Existencias y vencimientos</span></div>
+                <div><strong>Por rol</strong><span>Accesos del equipo</span></div>
+              </div>
             </div>
-            <div class="trust-note">
-              <span class="trust-icon"><mat-icon aria-hidden="true">favorite</mat-icon></span>
-              <span>Hecho para acompañar el cuidado de cada comunidad.</span>
+
+            <div class="quipu-panel">
+              <div class="panel-heading">
+                <span class="panel-icon"><mat-icon aria-hidden="true">device_hub</mat-icon></span>
+                <div><strong>Una gestión conectada</strong><small>Los módulos de tu farmacia, en contexto</small></div>
+              </div>
+              <div class="quipu-visual">
+                <svg class="quipu-diagram" viewBox="0 0 360 300" role="img"
+                     aria-labelledby="quipu-title quipu-description">
+                  <title id="quipu-title">Diagrama inspirado en un quipu</title>
+                  <desc id="quipu-description">Una cuerda principal conecta cuatro hilos que representan catálogo, inventario, ventas y equipo.</desc>
+                  <line class="main-cord" x1="20" x2="340" y1="36" y2="36"/>
+                  <circle class="main-node" cx="20" cy="36" r="6"/>
+                  <circle class="main-node" cx="340" cy="36" r="6"/>
+                  <circle class="main-knot" cx="70" cy="36" r="5"/>
+                  <circle class="main-knot" cx="150" cy="36" r="5"/>
+                  <circle class="main-knot" cx="230" cy="36" r="5"/>
+                  <circle class="main-knot" cx="300" cy="36" r="5"/>
+                  <path class="thread thread-coral" d="M70 36V240"/>
+                  <circle class="knot knot-coral" cx="70" cy="90" r="7"/>
+                  <circle class="knot knot-coral" cx="70" cy="140" r="10"/>
+                  <circle class="knot knot-coral" cx="70" cy="190" r="6"/>
+                  <path class="thread thread-ochre" d="M150 36V260"/>
+                  <circle class="knot knot-ochre" cx="150" cy="80" r="8"/>
+                  <circle class="knot knot-ochre" cx="150" cy="130" r="11"/>
+                  <circle class="knot knot-ochre" cx="150" cy="180" r="7"/>
+                  <circle class="knot knot-ochre" cx="150" cy="225" r="9"/>
+                  <path class="thread thread-green" d="M230 36V230"/>
+                  <circle class="knot knot-green" cx="230" cy="100" r="9"/>
+                  <circle class="knot knot-green" cx="230" cy="150" r="7"/>
+                  <circle class="knot knot-green" cx="230" cy="200" r="10"/>
+                  <path class="thread thread-blue" d="M300 36V210"/>
+                  <circle class="knot knot-blue" cx="300" cy="85" r="6"/>
+                  <circle class="knot knot-blue" cx="300" cy="135" r="8"/>
+                  <circle class="knot knot-blue" cx="300" cy="175" r="7"/>
+                </svg>
+              </div>
+              <div class="quipu-legend">
+                <span><i class="legend-coral"></i>Catálogo</span>
+                <span><i class="legend-ochre"></i>Inventario</span>
+                <span><i class="legend-green"></i>Ventas</span>
+                <span><i class="legend-blue"></i>Equipo</span>
+              </div>
+              <div class="panel-foot"><mat-icon aria-hidden="true">shield</mat-icon> Información aislada por farmacia y accesos por rol</div>
             </div>
           </div>
+        </section>
 
-          <div class="hero-art" aria-label="Ilustración de un quipu andino">
-            <div class="art-caption"><span>Un saber que nos conecta</span><span>01 — 04</span></div>
-            <svg class="quipu-art" viewBox="0 0 560 470" fill="none" role="img"
-                 aria-labelledby="quipu-title">
-              <title id="quipu-title">Cuerdas y nudos inspirados en un quipu</title>
-              <path class="cord cord-main" d="M276 26c-5 54 8 82-4 130-12 49 8 91-4 140-11 46 6 84 0 145" />
-              <path class="cord cord-red" d="M276 105c-36 14-60 21-88 47-28 26-25 50-49 76-21 23-34 50-45 95" />
-              <path class="cord cord-blue" d="M276 135c38 2 66 9 98 29 31 20 38 48 65 69 25 20 44 45 59 81" />
-              <path class="cord cord-gold" d="M274 212c-35 3-67 17-90 39-23 22-36 42-64 54" />
-              <path class="cord cord-green" d="M272 244c40 3 69 19 90 40 22 22 35 40 69 56" />
-              <path class="cord cord-red-light" d="M270 308c-29 5-48 19-61 36-13 17-21 32-43 45" />
-              <path class="cord cord-blue-light" d="M270 333c31 5 51 21 65 40 13 18 26 31 47 44" />
-              <g class="knots">
-                <circle cx="276" cy="105" r="10" /><circle cx="184" cy="152" r="8" />
-                <circle cx="373" cy="164" r="9" /><circle cx="141" cy="278" r="8" />
-                <circle cx="439" cy="233" r="8" /><circle cx="184" cy="251" r="7" />
-                <circle cx="362" cy="284" r="8" /><circle cx="208" cy="344" r="8" />
-                <circle cx="335" cy="373" r="7" />
-              </g>
-              <circle class="sun" cx="276" cy="26" r="13" />
-              <path class="sun-ray" d="M276 5v-4m0 50v-4m21-21h4m-50 0h4m36-15 3-3m-36 36 3-3m30 0 3 3m-36-36 3 3" />
-            </svg>
-            <div class="art-note note-left"><span class="note-dot coral"></span> Historia</div>
-            <div class="art-note note-right"><span class="note-dot blue"></span> Cuidado</div>
-            <div class="art-note note-bottom"><span class="note-dot gold"></span> Comunidad</div>
+        <section class="purpose section-tint" id="proposito">
+          <div class="section-inner">
+            <div class="section-intro">
+              <div>
+                <p class="eyebrow"><span></span> Desafíos en mostrador y trastienda</p>
+                <h2>La operación diaria merece más claridad.</h2>
+              </div>
+              <p>Menos registros dispersos: reúne las tareas esenciales para consultar y organizar la farmacia.</p>
+            </div>
+            <div class="challenge-grid">
+              <article class="challenge-card coral-edge">
+                <span class="challenge-icon coral"><mat-icon aria-hidden="true">menu_book</mat-icon></span>
+                <h3>Registros separados</h3>
+                <p>Catálogo, movimientos y ventas organizados en sus propios módulos, disponibles desde el mismo espacio.</p>
+                <span class="challenge-tag">Catálogo y kardex</span>
+              </article>
+              <article class="challenge-card ochre-edge">
+                <span class="challenge-icon ochre"><mat-icon aria-hidden="true">event_busy</mat-icon></span>
+                <h3>Fechas de vencimiento</h3>
+                <p>Asocia lotes y vencimientos al inventario para consultar alertas y revisar existencias.</p>
+                <span class="challenge-tag">Seguimiento por lote</span>
+              </article>
+              <article class="challenge-card coral-edge">
+                <span class="challenge-icon coral"><mat-icon aria-hidden="true">production_quantity_limits</mat-icon></span>
+                <h3>Stock difícil de seguir</h3>
+                <p>Consulta cantidades disponibles y movimientos registrados para tener una vista más clara del stock.</p>
+                <span class="challenge-tag">Existencias y movimientos</span>
+              </article>
+              <article class="challenge-card green-edge">
+                <span class="challenge-icon green"><mat-icon aria-hidden="true">groups</mat-icon></span>
+                <h3>Trabajo en equipo</h3>
+                <p>Administra cuentas, roles y delegaciones para organizar quién puede acceder a cada función.</p>
+                <span class="challenge-tag">Roles y permisos</span>
+              </article>
+            </div>
           </div>
         </section>
 
         <section class="tools" id="herramientas">
-          <div class="section-heading">
-            <p class="eyebrow"><span></span> Todo conectado</p>
-            <h2>Orden para tu día.<br><em>Tiempo para cuidar.</em></h2>
-            <p>Las tareas de siempre, ahora más sencillas y en sintonía.</p>
+          <div class="section-inner">
+            <div class="centered-heading">
+              <p class="eyebrow"><span></span> Herramientas para el trabajo diario <span></span></p>
+              <h2>Lo esencial, en un solo lugar.</h2>
+              <p>Consulta y organiza la operación de tu farmacia desde módulos conectados.</p>
+            </div>
+            <div class="tools-grid">
+              <article class="feature-card">
+                <div class="feature-top"><span class="feature-icon coral"><mat-icon aria-hidden="true">medication</mat-icon></span><span class="feature-tag">Catálogo</span></div>
+                <h3>Productos y categorías</h3>
+                <p>Organiza productos, precios y categorías para mantener el catálogo accesible.</p>
+                <div class="feature-meta"><mat-icon aria-hidden="true">inventory_2</mat-icon> Catálogo de la farmacia</div>
+              </article>
+              <article class="feature-card">
+                <div class="feature-top"><span class="feature-icon ochre"><mat-icon aria-hidden="true">inventory_2</mat-icon></span><span class="feature-tag">Trazabilidad</span></div>
+                <h3>Inventario y vencimientos</h3>
+                <p>Registra ingresos por lote, fechas de vencimiento y consulta movimientos de kardex.</p>
+                <div class="feature-meta"><mat-icon aria-hidden="true">calendar_month</mat-icon> Lotes y fechas</div>
+              </article>
+              <article class="feature-card">
+                <div class="feature-top"><span class="feature-icon green"><mat-icon aria-hidden="true">point_of_sale</mat-icon></span><span class="feature-tag">Operación</span></div>
+                <h3>Ventas e historial</h3>
+                <p>Registra ventas, consulta su estado y revisa el historial de operaciones.</p>
+                <div class="feature-meta"><mat-icon aria-hidden="true">receipt_long</mat-icon> Ventas registradas</div>
+              </article>
+              <article class="feature-card">
+                <div class="feature-top"><span class="feature-icon blue"><mat-icon aria-hidden="true">groups</mat-icon></span><span class="feature-tag">Comunidad</span></div>
+                <h3>Directorio de clientes</h3>
+                <p>Consulta y administra los datos de contacto de los clientes de la farmacia.</p>
+                <div class="feature-meta"><mat-icon aria-hidden="true">contact_page</mat-icon> Fichas de clientes</div>
+              </article>
+              <article class="feature-card">
+                <div class="feature-top"><span class="feature-icon blue"><mat-icon aria-hidden="true">badge</mat-icon></span><span class="feature-tag">Equipo</span></div>
+                <h3>Personal y usuarios</h3>
+                <p>Gestiona registros del personal, cuentas de acceso y permisos según el rol.</p>
+                <div class="feature-meta"><mat-icon aria-hidden="true">admin_panel_settings</mat-icon> Acceso por rol</div>
+              </article>
+              <article class="feature-card">
+                <div class="feature-top"><span class="feature-icon green"><mat-icon aria-hidden="true">analytics</mat-icon></span><span class="feature-tag">Resumen</span></div>
+                <h3>Dashboard</h3>
+                <p>Consulta indicadores de clientes, productos, ventas y personal según tus permisos.</p>
+                <div class="feature-meta"><mat-icon aria-hidden="true">query_stats</mat-icon> Resumen operativo</div>
+              </article>
+            </div>
           </div>
-          <div class="tool-list">
-            <article class="tool-card">
-              <span class="tool-icon coral"><mat-icon aria-hidden="true">inventory_2</mat-icon></span>
-              <div><h3>Productos y stock</h3><p>Ten a la vista lo que tienes y lo que hace falta.</p></div>
-              <span class="card-number">01</span>
-            </article>
-            <article class="tool-card">
-              <span class="tool-icon ochre"><mat-icon aria-hidden="true">receipt_long</mat-icon></span>
-              <div><h3>Ventas claras</h3><p>Registra cada venta y sigue el movimiento del día.</p></div>
-              <span class="card-number">02</span>
-            </article>
-            <article class="tool-card">
-              <span class="tool-icon green"><mat-icon aria-hidden="true">groups</mat-icon></span>
-              <div><h3>Personas y equipo</h3><p>Organiza tus contactos y trabaja en comunidad.</p></div>
-              <span class="card-number">03</span>
-            </article>
+        </section>
+
+        <section class="identity section-tint" id="identidad">
+          <div class="section-inner identity-grid">
+            <div class="identity-copy">
+              <p class="eyebrow"><span></span> Identidad y metodología</p>
+              <h2>Un saber que nos conecta con la gestión diaria.</h2>
+              <p>
+                El quipu organizaba información mediante cuerdas y nudos. Esa idea inspira KipuSalud:
+                reunir tareas distintas y presentarlas con orden, claridad y una identidad cercana.
+              </p>
+              <p class="identity-note"><mat-icon aria-hidden="true">gesture</mat-icon> Una referencia cultural que da forma a la experiencia digital.</p>
+            </div>
+            <div class="color-guide" aria-label="Significado de los colores de KipuSalud">
+              <article><span class="color-token coral"><mat-icon aria-hidden="true">shopping_cart_checkout</mat-icon></span><div><strong>Terracota <small>Acción</small></strong><p>Acciones principales y operaciones de salida.</p></div></article>
+              <article><span class="color-token ochre"><mat-icon aria-hidden="true">warning</mat-icon></span><div><strong>Ocre <small>Atención</small></strong><p>Indicadores preventivos y alertas que requieren revisión.</p></div></article>
+              <article><span class="color-token green"><mat-icon aria-hidden="true">check_circle</mat-icon></span><div><strong>Verde andino <small>Estado</small></strong><p>Estados positivos y elementos confirmados.</p></div></article>
+              <article><span class="color-token blue"><mat-icon aria-hidden="true">account_tree</mat-icon></span><div><strong>Azul apagado <small>Estructura</small></strong><p>Información de organización, equipo y contexto.</p></div></article>
+            </div>
+          </div>
+        </section>
+
+        <section class="pharmacy-stories" aria-labelledby="pharmacy-stories-title">
+          <div class="photo-heading">
+            <div>
+              <p class="eyebrow"><span></span> Cerca de cada comunidad</p>
+              <h2 id="pharmacy-stories-title">Un espacio para cuidar,<br><em>con calidez y confianza.</em></h2>
+            </div>
+            <p>Detrás de cada farmacia hay personas que acompañan y hacen comunidad.</p>
+          </div>
+          <div class="photo-grid">
+            <figure class="photo-card">
+              <div class="photo-frame">
+                <img src="/images/pharmacy-interior.jpg"
+                     alt="Interior de una farmacia con mostrador y productos de cuidado"
+                     width="600" height="449" loading="lazy" decoding="async">
+                <span class="photo-label">Cuidado cercano</span>
+              </div>
+              <figcaption>
+                <span>Un lugar de confianza para cada visita.</span>
+                <small>“CVS/pharmacy Interior” · <a href="https://www.flickr.com/photos/67408512@N03/15550245072" target="_blank" rel="noopener noreferrer">Random Retail</a> · <a href="https://creativecommons.org/licenses/by/2.0/" target="_blank" rel="noopener noreferrer">CC BY 2.0</a></small>
+              </figcaption>
+            </figure>
+            <figure class="photo-card">
+              <div class="photo-frame">
+                <img src="/images/pharmacy-counter.jpg"
+                     alt="Pasillos y mostrador de una farmacia con señalización de farmacia"
+                     width="600" height="449" loading="lazy" decoding="async">
+                <span class="photo-label">Atención que acompaña</span>
+              </div>
+              <figcaption>
+                <span>Todo empieza con escuchar.</span>
+                <small>“CVS/pharmacy Interior” · <a href="https://www.flickr.com/photos/67408512@N03/14928645324" target="_blank" rel="noopener noreferrer">Random Retail</a> · <a href="https://creativecommons.org/licenses/by/2.0/" target="_blank" rel="noopener noreferrer">CC BY 2.0</a></small>
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <section class="access section-tint" id="para-farmacias">
+          <div class="section-inner access-panel">
+            <div class="access-copy">
+              <p class="eyebrow"><span></span> Diseñado para el trabajo cotidiano</p>
+              <h2>Tu farmacia, desde el navegador.</h2>
+              <p>KipuSalud es una aplicación web alojada en la nube. El equipo autorizado puede acceder con conexión a internet y las credenciales de su farmacia.</p>
+              <ul>
+                <li><mat-icon aria-hidden="true">check</mat-icon> No requiere instalar un programa de escritorio.</li>
+                <li><mat-icon aria-hidden="true">check</mat-icon> El acceso se organiza por farmacia y rol de usuario.</li>
+                <li><mat-icon aria-hidden="true">check</mat-icon> Los módulos están disponibles desde equipos con navegador moderno.</li>
+              </ul>
+            </div>
+            <div class="device-list" aria-label="Usos por dispositivo">
+              <div><mat-icon aria-hidden="true">laptop_mac</mat-icon><span><strong>Computadora</strong><small>Catálogo, ventas y administración</small></span></div>
+              <div><mat-icon aria-hidden="true">tablet_mac</mat-icon><span><strong>Tableta</strong><small>Consulta en el área de trabajo</small></span></div>
+              <div><mat-icon aria-hidden="true">desktop_windows</mat-icon><span><strong>Navegador web</strong><small>Acceso según permisos de la cuenta</small></span></div>
+              <p>Se requiere conexión a internet para utilizar la aplicación.</p>
+            </div>
           </div>
         </section>
 
         <section class="closing">
-          <div class="closing-knot" aria-hidden="true">✳</div>
-          <div>
-            <p class="eyebrow">KipuSalud</p>
-            <h2>La gestión también puede<br><em>sentirse cercana.</em></h2>
+          <span class="closing-mark" aria-hidden="true"><mat-icon>hub</mat-icon></span>
+          <p class="eyebrow">KipuSalud</p>
+          <h2>¿Listo para ordenar la gestión<br>de tu farmacia?</h2>
+          <p>Reúne inventario, ventas y gestión del equipo en un solo espacio.</p>
+          <div class="closing-actions">
+            <a class="button button-primary" routerLink="/auth/registro">Comenzar ahora</a>
+            <a class="button button-secondary" routerLink="/auth/login">Iniciar sesión</a>
           </div>
-          <a class="button button-light" routerLink="/auth/login">
-            Ingresar a mi espacio <mat-icon aria-hidden="true">arrow_forward</mat-icon>
-          </a>
+          <small>KipuSalud es una herramienta de gestión administrativa y logística para farmacias.</small>
         </section>
       </main>
 
       <footer class="site-footer">
-        <a class="brand footer-brand" routerLink="/">
-          <span class="brand-mark" aria-hidden="true">
-            <img src="/kipusalud-mark.svg" alt="">
-          </span>
-          <span class="brand-name">kipu<span>salud</span></span>
+        <a class="brand footer-brand" routerLink="/" aria-label="KipuSalud, inicio">
+          <span class="brand-mark" aria-hidden="true"><img src="/kipusalud-mark.svg" alt=""></span>
+          <span class="brand-copy"><strong>KipuSalud</strong><small>Gestión logística farmacéutica</small></span>
         </a>
         <p>Una gestión con raíces y propósito.</p>
+        <a href="https://creativecommons.org/licenses/by/2.0/" target="_blank" rel="noopener noreferrer">Fotografías: Random Retail · CC BY 2.0</a>
         <span class="copyright">© KipuSalud</span>
       </footer>
     </div>
   `,
-  styles: `
-    :host { display: block; }
-    .landing {
-      --ink: #29271f; --muted: #716b5e; --paper: #faf7ef; --line: #e9e1d1;
-      --coral: #b94c37; --ochre: #c18a28; --green: #456b53; --blue: #557c91;
-      min-height: 100vh; overflow: hidden; color: var(--ink); background: var(--paper);
-      font-family: 'DM Sans', 'Helvetica Neue', sans-serif;
-      background-image: linear-gradient(90deg, transparent 49.9%, rgba(111, 89, 55, .025) 50%, transparent 50.1%);
-    }
-    .site-header {
-      height: 82px; padding: 0 clamp(24px, 7vw, 104px); display: flex; align-items: center;
-      justify-content: space-between; border-bottom: 1px solid var(--line);
-      border-top: 4px solid transparent;
-      border-image: repeating-linear-gradient(90deg, var(--coral) 0 34px, var(--ochre) 34px 68px,
-        var(--green) 68px 102px, var(--blue) 102px 136px) 1;
-    }
-    .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
-    .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; }
-    .brand-mark img { width: 100%; height: 100%; }
-    .brand-name { font-family: Georgia, serif; font-size: 22px; letter-spacing: -.7px; font-weight: 700; }
-    .brand-name span { color: var(--coral); font-weight: 400; }
-    .main-nav { display: flex; align-items: center; gap: clamp(22px, 4vw, 54px); }
-    .main-nav a, .text-link { color: var(--muted); text-decoration: none; font-size: 13px; }
-    .main-nav a:hover, .text-link:hover { color: var(--coral); }
-    .header-action { display: inline-flex; gap: 8px; align-items: center; color: var(--coral); text-decoration: none; font-size: 13px; font-weight: 600; }
-    .header-action mat-icon, .button mat-icon { width: 18px; height: 18px; font-size: 18px; }
-    .hero {
-      max-width: 1240px; min-height: 570px; margin: auto; padding: 70px 7% 62px;
-      display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 30px;
-    }
-    .eyebrow { display: flex; align-items: center; gap: 10px; margin: 0 0 21px; color: var(--green); font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
-    .eyebrow > span { width: 24px; height: 1px; background: var(--ochre); }
-    h1, h2, h3, p { margin-top: 0; }
-    h1 { margin-bottom: 22px; font: 500 clamp(40px, 5.1vw, 66px)/1.04 Georgia, 'Times New Roman', serif; letter-spacing: -2px; }
-    h1 em, h2 em { color: var(--coral); font-weight: 400; }
-    .intro { max-width: 440px; margin-bottom: 29px; color: var(--muted); font-size: 15px; line-height: 1.8; }
-    .hero-actions { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
-    .button { display: inline-flex; align-items: center; justify-content: center; gap: 13px; min-height: 47px; padding: 0 20px; border-radius: 3px; text-decoration: none; font-size: 12px; font-weight: 600; transition: transform .2s, box-shadow .2s; }
-    .button:hover { transform: translateY(-2px); box-shadow: 0 7px 20px rgba(41, 39, 31, .13); }
-    .button-primary { color: #fffaf1; background: var(--coral); }
-    .text-link { text-decoration: underline; text-decoration-color: #cdbd9f; text-underline-offset: 5px; }
-    .trust-note { display: flex; align-items: center; gap: 11px; margin-top: 47px; color: #777061; font-size: 11px; }
-    .trust-icon { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid #e4d8c5; border-radius: 50%; color: var(--coral); }
-    .trust-icon mat-icon { width: 16px; height: 16px; font-size: 16px; }
-    .hero-art { position: relative; min-height: 420px; display: flex; align-items: center; justify-content: center; }
-    .hero-art:before { content: ''; position: absolute; width: min(83%, 390px); aspect-ratio: 1; border-radius: 50%; background: #f0eadb; }
-    .hero-art:after { content: ''; position: absolute; width: min(67%, 310px); aspect-ratio: 1; border: 1px solid #e4dac7; border-radius: 50%; }
-    .art-caption { position: absolute; z-index: 1; inset: 17px 0 auto; display: flex; justify-content: space-between; color: #877d68; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; }
-    .quipu-art { position: relative; z-index: 1; width: min(100%, 470px); height: auto; overflow: visible; }
-    .cord { stroke-width: 4; stroke-linecap: round; }
-    .cord-main { stroke: #9a6c31; stroke-width: 6; }
-    .cord-red, .cord-red-light { stroke: var(--coral); }
-    .cord-blue, .cord-blue-light { stroke: var(--blue); }
-    .cord-gold { stroke: var(--ochre); }.cord-green { stroke: var(--green); }
-    .cord-red-light, .cord-blue-light { stroke-width: 3; }
-    .knots circle { fill: var(--paper); stroke: var(--ochre); stroke-width: 4; }
-    .sun { fill: var(--ochre); }.sun-ray { stroke: var(--ochre); stroke-width: 2; stroke-linecap: round; }
-    .art-note { position: absolute; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid #e7dfd0; background: rgba(250, 247, 239, .92); color: #635d51; font: 11px Georgia, serif; }
-    .note-left { left: 0; top: 28%; }.note-right { right: -4px; top: 48%; }.note-bottom { bottom: 15px; left: 22%; }
-    .note-dot { width: 7px; height: 7px; border-radius: 50%; }.note-dot.coral { background: var(--coral); }.note-dot.blue { background: var(--blue); }.note-dot.gold { background: var(--ochre); }
-    .tools { border-top: 1px solid var(--line); padding: 80px 8% 87px; display: grid; grid-template-columns: .8fr 1.2fr; gap: 9%; }
-    .section-heading h2, .closing h2 { margin-bottom: 15px; font: 500 clamp(31px, 3.6vw, 44px)/1.12 Georgia, serif; letter-spacing: -1px; }
-    .section-heading > p:last-child { max-width: 300px; color: var(--muted); font-size: 13px; line-height: 1.7; }
-    .tool-list { border-top: 1px solid var(--line); }
-    .tool-card { display: grid; grid-template-columns: 46px 1fr auto; align-items: center; gap: 16px; min-height: 100px; border-bottom: 1px solid var(--line); }
-    .tool-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; }
-    .tool-icon mat-icon { width: 20px; height: 20px; font-size: 20px; }
-    .tool-icon.coral { background: #f4e3dc; color: var(--coral); }.tool-icon.ochre { background: #f3ead6; color: #9a711d; }.tool-icon.green { background: #e2ebe1; color: var(--green); }
-    .tool-card h3 { margin-bottom: 5px; font: 600 15px Georgia, serif; }
-    .tool-card p { margin-bottom: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
-    .card-number { color: #9d927e; font-size: 10px; letter-spacing: 1px; }
-    .closing { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 52px 8%; background: #315947; color: #fffaf1; }
-    .closing:before { content: ''; position: absolute; inset: auto 0 0; height: 5px; background: repeating-linear-gradient(90deg, var(--coral) 0 34px, var(--ochre) 34px 68px, #d7bd7c 68px 102px, #77917a 102px 136px); }
-    .closing-knot { position: absolute; right: 40%; top: 18px; color: rgba(255,255,255,.08); font-size: 98px; }
-    .closing .eyebrow { margin-bottom: 12px; color: #d5c69e; }.closing h2 { margin-bottom: 0; }
-    .closing h2 em { color: #edc47c; }.button-light { flex: none; color: #315947; background: #faf5e9; }
-    .site-footer { min-height: 92px; padding: 18px 8%; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-    .footer-brand .brand-mark { width: 30px; height: 30px; }.footer-brand .brand-name { font-size: 18px; }
-    .site-footer p, .copyright { margin: 0; color: #847b6c; font-size: 10px; }
-    @media (max-width: 760px) {
-      .site-header { height: 70px; padding: 0 22px; }.main-nav { display: none; }
-      .hero { grid-template-columns: 1fr; padding: 58px 8% 36px; gap: 15px; }
-      h1 { font-size: clamp(42px, 10vw, 60px); }.hero-art { min-height: 350px; }
-      .quipu-art { max-width: 390px; }.tools { grid-template-columns: 1fr; padding: 58px 8%; gap: 24px; }
-      .closing { align-items: flex-start; flex-direction: column; padding: 43px 8%; }.closing-knot { right: 8%; top: 7px; }
-      .site-footer { flex-wrap: wrap; padding: 22px 8%; }.site-footer p { order: 1; width: 100%; }
-    }
-    @media (prefers-reduced-motion: reduce) { *, *:before, *:after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
-  `
+  styles: []
 })
 export class LandingComponent {}

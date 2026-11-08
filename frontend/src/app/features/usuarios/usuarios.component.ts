@@ -199,10 +199,10 @@ import { AuthService, UsuarioFarmacia } from '../../services/auth.service';
     .table-wrap { overflow-x: auto; }
     table { min-width: 720px; }
     .actions { display: grid; gap: 4px; justify-items: start; }
-    .account-state { display: inline-block; padding: 4px 9px; border-radius: 20px; background: #e5eee3; color: #456b53; font-size: 11px; }
-    .account-state.inactive { background: #f4e3dc; color: #8e382a; }
+    .account-state { display: inline-block; padding: 4px 9px; border-radius: 20px; background: #c2edce; color: #294e38; font-size: 11px; }
+    .account-state.inactive { background: #ffdad6; color: #832514; }
     .empty-state { padding: 20px; color: var(--kipu-muted); text-align: center; }
-    .success-message { padding: 12px 16px; background: #e5eee3; color: #315a3d; border-radius: 8px; }
+    .success-message { padding: 12px 16px; background: #c2edce; color: #294e38; border-radius: 8px; }
     .muted { color: var(--kipu-muted); }
     @media (max-width: 900px) { .users-grid { grid-template-columns: 1fr; } }
   `

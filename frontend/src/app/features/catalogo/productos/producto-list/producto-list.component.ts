@@ -123,8 +123,8 @@ import { ConfirmDialogComponent } from '../../../../shared/components/confirm-di
     </div>
   `,
   styles: `
-    .stock-pill { display: inline-block; min-width: 44px; padding: 5px 9px; border-radius: 20px; background: #e5eee3; color: #456b53; font-size: 11px; text-align: center; }
-    .stock-pill.low-stock { background: #fff0e6; color: #9c4c2e; }
+    .stock-pill { display: inline-block; min-width: 44px; padding: 5px 9px; border-radius: 20px; background: #c2edce; color: #294e38; font-size: 11px; text-align: center; }
+    .stock-pill.low-stock { background: #ffdad6; color: #832514; }
   `
 })
 export class ProductoListComponent implements OnInit, AfterViewInit {

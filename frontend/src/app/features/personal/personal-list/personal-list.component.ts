@@ -121,12 +121,12 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
     }
 
     .btn-excel {
-      background-color: #1D7044;
+      background-color: #41664f;
       color: #ffffff;
     }
 
     .btn-excel:hover {
-      background-color: #155c36;
+      background-color: #294e38;
     }
   `
 })

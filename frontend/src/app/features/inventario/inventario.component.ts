@@ -247,19 +247,19 @@ import { createIdempotencyKey } from '../../core/utils/idempotency-key';
     </main>
   `,
   styles: [`
-    .intro, .help, .section-heading p { color: #62594e; }
+    .intro, .help, .section-heading p { color: #57423e; }
     .tab-content { padding: 24px 0; }
     .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; align-items: center; }
     .form-grid mat-form-field, .product-select { width: 100%; }
     .table-wrap { overflow-x: auto; }
     table { width: 100%; }
-    .empty-state { padding: 24px 12px; color: #62594e; text-align: center; }
+    .empty-state { padding: 24px 12px; color: #57423e; text-align: center; }
     .section-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin: 8px 0 18px; }
     .section-heading h2 { margin: 0; }
     .alert-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
-    .alert-card { border-left: 4px solid #c79036; }
-    .alert-card.high { border-left-color: #b94c37; }
-    .priority { color: #6e5331; font-size: .8rem; font-weight: 700; text-transform: uppercase; }
+    .alert-card { border-left: 4px solid #966500; }
+    .alert-card.high { border-left-color: #993522; }
+    .priority { color: #764e00; font-size: .8rem; font-weight: 700; text-transform: uppercase; }
     .alert-card h3 { margin: 10px 0 4px; }
     @media (max-width: 600px) {
       .section-heading { align-items: flex-start; flex-direction: column; }
