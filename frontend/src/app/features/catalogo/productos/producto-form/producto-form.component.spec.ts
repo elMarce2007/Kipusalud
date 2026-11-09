@@ -1,6 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { HarnessLoader } from '@angular/cdk/testing';
+import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { provideRouter } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatSelectHarness } from '@angular/material/select/testing';
 import { Observable, of, throwError } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -15,6 +18,7 @@ describe('ProductoFormComponent category selection', () => {
   ];
   let categoriaService: { listar: () => Observable<Categoria[]> };
   let fixture: ComponentFixture<ProductoFormComponent>;
+  let loader: HarnessLoader;
 
   beforeEach(async () => {
     categoriaService = { listar: () => of(categorias) };
@@ -29,6 +33,7 @@ describe('ProductoFormComponent category selection', () => {
     }).compileComponents();
     fixture = TestBed.createComponent(ProductoFormComponent);
     fixture.detectChanges();
+    loader = TestbedHarnessEnvironment.loader(fixture);
   });
 
   afterEach(() => {
@@ -36,14 +41,22 @@ describe('ProductoFormComponent category selection', () => {
     TestBed.resetTestingModule();
   });
 
-  it('starts without an invalid placeholder value and loads selectable categories', () => {
+  it('allows selecting a loaded category without an invalid placeholder value', async () => {
     const component = fixture.componentInstance;
 
     expect(component.form.controls.categoriaId.value).toBeNull();
     expect(component.form.controls.categoriaId.hasError('required')).toBe(true);
     expect(component.categorias()).toEqual(categorias);
 
-    component.form.controls.categoriaId.setValue(1);
+    const select = await loader.getHarness(MatSelectHarness);
+    await select.open();
+    const options = await select.getOptions();
+    expect(await Promise.all(options.map(option => option.getText()))).toEqual(['Analgésicos']);
+    await options[0].click();
+    fixture.detectChanges();
+
+    expect(await select.getValueText()).toBe('Analgésicos');
+    expect(component.form.controls.categoriaId.value).toBe(1);
     expect(component.form.controls.categoriaId.valid).toBe(true);
   });
 
