@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, input, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -52,32 +52,33 @@ import { Producto } from '../../../../models/producto.model';
                 }
               </mat-form-field>
 
-              <mat-form-field appearance="outline">
-                <mat-label>Categoria</mat-label>
-                <mat-select formControlName="categoriaId" placeholder="Selecciona una categoría"
-                            [disabled]="cargandoCategorias() || !!errorCategorias() || categorias().length === 0">
-                  @for (cat of categorias(); track cat.id) {
-                    <mat-option [value]="cat.id">{{ cat.nombre }}</mat-option>
+              <div class="category-field">
+                <mat-form-field appearance="outline">
+                  <mat-label>Categoría</mat-label>
+                  <mat-select formControlName="categoriaId"
+                              [disabled]="cargandoCategorias() || !!errorCategorias() || categorias().length === 0">
+                    @for (cat of categorias(); track cat.id) {
+                      <mat-option [value]="cat.id">{{ cat.nombre }}</mat-option>
+                    }
+                  </mat-select>
+                  @if (form.get('categoriaId')?.hasError('required') && form.get('categoriaId')?.touched) {
+                    <mat-error>Selecciona una categoría</mat-error>
                   }
-                </mat-select>
-                @if (errorCategorias()) {
-                  <mat-hint>
+                </mat-form-field>
+                @if (cargandoCategorias()) {
+                  <p class="category-status" role="status">Cargando categorías…</p>
+                } @else if (errorCategorias()) {
+                  <p class="category-status" role="alert">
                     No se pudieron cargar las categorías.
                     <button mat-button type="button" (click)="cargarCategorias()">Reintentar</button>
-                  </mat-hint>
-                } @else if (!cargandoCategorias() && categorias().length === 0) {
-                  <mat-hint>
+                  </p>
+                } @else if (categorias().length === 0) {
+                  <p class="category-status" role="status">
                     Aún no hay categorías.
                     <a routerLink="/catalogo/categorias/nuevo">Crear categoría</a>
-                  </mat-hint>
+                  </p>
                 }
-                @if (form.get('categoriaId')?.hasError('required') && form.get('categoriaId')?.touched) {
-                  <mat-error>Categoria es requerida</mat-error>
-                }
-                @if (form.get('categoriaId')?.hasError('min') && form.get('categoriaId')?.touched) {
-                  <mat-error>Selecciona una categoría válida</mat-error>
-                }
-              </mat-form-field>
+              </div>
 
               <mat-form-field appearance="outline">
                 <mat-label>Precio</mat-label>
@@ -183,6 +184,10 @@ import { Producto } from '../../../../models/producto.model';
   `,
   styles: `
     .form-help { color: #62594e; line-height: 1.5; }
+    .category-field { min-width: 0; }
+    .category-field mat-form-field { width: 100%; }
+    .category-status { margin: -12px 0 12px; color: #62594e; font-size: 13px; }
+    .category-status a { color: #993522; }
     .initial-inventory { margin-top: 24px; padding-top: 16px; border-top: 1px solid #e4dfd8; }
     .initial-inventory h2 { font-size: 1.1rem; }
     .inventory-toggle { display: flex; align-items: center; gap: 10px; }
@@ -191,6 +196,7 @@ import { Producto } from '../../../../models/producto.model';
 })
 export class ProductoFormComponent implements OnInit {
   private fb = inject(FormBuilder);
+  private destroyRef = inject(DestroyRef);
   private productoService = inject(ProductoService);
   private categoriaService = inject(CategoriaService);
   private router = inject(Router);
@@ -211,7 +217,7 @@ export class ProductoFormComponent implements OnInit {
     descripcion: [''],
     precio: [0, [Validators.required, Validators.min(0.01)]],
     stockMinimo: [0, [Validators.required, Validators.min(0), Validators.max(1_000_000)]],
-    categoriaId: [0, [Validators.required, Validators.min(1)]],
+    categoriaId: this.fb.control<number | null>(null, Validators.required),
     registrarStockInicial: [true],
     codigoLote: ['', [Validators.required, Validators.maxLength(100)]],
     fechaVencimiento: ['', [Validators.required, this.validarFechaVencimiento]],
@@ -226,7 +232,7 @@ export class ProductoFormComponent implements OnInit {
 
   ngOnInit() {
     this.form.controls.registrarStockInicial.valueChanges
-      .pipe(takeUntilDestroyed())
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(registrar => this.actualizarValidacionesIngreso(registrar));
     this.cargarCategorias();
     if (this.id()) {
@@ -298,8 +304,12 @@ export class ProductoFormComponent implements OnInit {
       return;
     }
 
-    this.loading.set(true);
     const value = this.form.getRawValue();
+    if (value.categoriaId === null) {
+      this.form.controls.categoriaId.markAsTouched();
+      return;
+    }
+    this.loading.set(true);
     const producto: Producto = {
       nombre: value.nombre,
       descripcion: value.descripcion,
