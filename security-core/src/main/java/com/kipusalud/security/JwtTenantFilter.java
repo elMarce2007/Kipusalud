@@ -34,7 +34,9 @@ final class JwtTenantFilter extends OncePerRequestFilter {
         return "OPTIONS".equals(request.getMethod())
                 || path.startsWith("/actuator/")
                 || (("POST".equals(request.getMethod()))
-                    && ("/api/auth/login".equals(path) || "/api/auth/registro".equals(path)));
+                    && ("/api/auth/login".equals(path)
+                        || "/api/auth/registro".equals(path)
+                        || "/api/auth/demo/sessions".equals(path)));
     }
 
     @Override

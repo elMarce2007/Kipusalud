@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { DemoSessionResponse } from '../models/auth.model';
 import { LoginRequest, LoginResponse, RegistroRequest, Usuario } from '../models/auth.model';
 
 export interface UsuarioFarmacia {
@@ -91,6 +92,10 @@ export class AuthService {
           this.storeUser(usuario);
         })
       );
+  }
+
+  crearSesionDemo(): Observable<DemoSessionResponse> {
+    return this.http.post<DemoSessionResponse>(`${this.apiUrl}/demo/sessions`, {});
   }
 
   registro(data: RegistroRequest): Observable<LoginResponse> {

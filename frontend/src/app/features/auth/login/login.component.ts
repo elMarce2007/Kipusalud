@@ -8,6 +8,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../../services/auth.service';
+import { DemoCredential, DemoSessionResponse } from '../../../models/auth.model';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-login',
@@ -104,6 +106,40 @@ import { AuthService } from '../../../services/auth.service';
               }
             </button>
           </form>
+
+          @if (environment.demoAccessEnabled) {
+            <section class="demo-access" aria-label="Credenciales temporales de demostración">
+              <p>¿Quieres explorar la aplicación?</p>
+              @if (!demoSession()) {
+                <button mat-stroked-button type="button" class="full-width"
+                        [disabled]="loadingDemo()"
+                        (click)="crearSesionDemo()">
+                  @if (loadingDemo()) {
+                    <mat-spinner diameter="18"></mat-spinner>
+                    Preparando farmacia temporal…
+                  } @else {
+                    Probar con cuentas de demostración
+                  }
+                </button>
+              } @else {
+                <p class="demo-pharmacy">
+                  {{ demoSession()!.farmaciaNombre }} · Código {{ demoSession()!.farmaciaCodigo }}
+                </p>
+                <div class="demo-roles">
+                  @for (credential of credentials(); track credential.rol) {
+                    <button mat-stroked-button type="button"
+                            (click)="rellenarCredenciales(credential)">
+                      Probar como {{ credential.etiqueta }}
+                    </button>
+                  }
+                </div>
+                <small>Sesión temporal; expira {{ demoExpiryLabel() }}. Al recargar, crea una farmacia demo nueva.</small>
+              }
+              @if (demoError()) {
+                <p class="demo-error" role="alert">{{ demoError() }}</p>
+              }
+            </section>
+          }
         </mat-card-content>
 
         <mat-card-actions>
@@ -113,7 +149,15 @@ import { AuthService } from '../../../services/auth.service';
       </mat-card>
     </div>
   `,
-  styles: ``
+  styles: `
+    .demo-access { display: grid; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e8e2d6; }
+    .demo-access > p { margin: 0; color: #57423e; font-size: 13px; }
+    .demo-pharmacy { font-weight: 600; }
+    .demo-roles { display: grid; gap: 8px; }
+    .demo-roles button { min-height: 38px; }
+    .demo-access small { color: #71635f; line-height: 1.5; }
+    .demo-error { color: #993522 !important; }
+  `
 })
 export class LoginComponent {
   private fb = inject(FormBuilder);
@@ -124,6 +168,14 @@ export class LoginComponent {
   hidePassword = signal(true);
   loading = signal(false);
   loginError = signal<string | null>(null);
+  demoSession = signal<DemoSessionResponse | null>(null);
+  loadingDemo = signal(false);
+  demoError = signal<string | null>(null);
+  readonly environment = environment;
+
+  credentials() {
+    return Object.values(this.demoSession()?.credenciales ?? {});
+  }
 
   loginForm = this.fb.nonNullable.group({
     farmaciaCodigo: ['', Validators.required],
@@ -148,5 +200,38 @@ export class LoginComponent {
           : 'No se pudo iniciar sesión. Verifica tu conexión e inténtalo de nuevo.');
       }
     });
+  }
+
+  crearSesionDemo() {
+    this.loadingDemo.set(true);
+    this.demoError.set(null);
+    this.authService.crearSesionDemo().subscribe({
+      next: session => {
+        this.demoSession.set(session);
+        this.loadingDemo.set(false);
+      },
+      error: error => {
+        console.error('No se pudo crear la sesión temporal de demostración.', error);
+        this.demoError.set('No se pudo preparar la farmacia demo. Inténtalo nuevamente más tarde.');
+        this.loadingDemo.set(false);
+      }
+    });
+  }
+
+  rellenarCredenciales(credential: DemoCredential) {
+    const session = this.demoSession();
+    if (!session) return;
+    this.loginForm.setValue({
+      farmaciaCodigo: session.farmaciaCodigo,
+      username: credential.username,
+      password: credential.password
+    });
+    this.hidePassword.set(true);
+    this.loginError.set(null);
+  }
+
+  demoExpiryLabel(): string {
+    const expiry = this.demoSession()?.expiraEn;
+    return expiry ? new Date(expiry).toLocaleTimeString() : '';
   }
 }

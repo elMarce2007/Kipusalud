@@ -32,6 +32,11 @@ jwt:
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION:86400000}
 
+demo:
+  sessions:
+    enabled: ${DEMO_SESSIONS_ENABLED:false}
+    ttl-minutes: ${DEMO_SESSION_TTL_MINUTES:60}
+
 management:
   endpoints:
     web:

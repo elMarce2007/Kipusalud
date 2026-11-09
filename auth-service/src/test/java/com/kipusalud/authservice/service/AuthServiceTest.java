@@ -4,6 +4,7 @@ import com.kipusalud.authservice.dto.LoginRequest;
 import com.kipusalud.authservice.entity.Farmacia;
 import com.kipusalud.authservice.entity.Usuario;
 import com.kipusalud.authservice.repository.FarmaciaRepository;
+import com.kipusalud.authservice.repository.DemoSessionRepository;
 import com.kipusalud.authservice.repository.UsuarioRepository;
 import com.kipusalud.authservice.util.JwtUtil;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,9 @@ class AuthServiceTest {
 
     @Mock
     private FarmaciaRepository farmaciaRepository;
+
+    @Mock
+    private DemoSessionRepository demoSessionRepository;
 
     @Mock
     private AuthenticationManager authenticationManager;

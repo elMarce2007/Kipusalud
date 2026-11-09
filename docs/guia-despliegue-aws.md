@@ -42,6 +42,8 @@ RABBITMQ_USER=kipusalud
 RABBITMQ_PASSWORD=<secreto-aleatorio-unico>
 JWT_SECRET=<salida-de-openssl-rand-base64-48>
 JWT_EXPIRATION=86400000
+DEMO_SESSIONS_ENABLED=false
+DEMO_SESSION_TTL_MINUTES=60
 SUNAT_MASTER_KEY=<salida-de-openssl-rand-base64-32>
 SUNAT_ENVIRONMENT=BETA
 ```
@@ -50,6 +52,12 @@ guárdalas en un gestor de secretos o en un `.env` con permisos restringidos.
 No reutilices contraseñas ni claves publicadas previamente. `SUNAT_MASTER_KEY`
 debe conservarse mientras existan credenciales SUNAT cifradas con ella; rotarla
 requiere descifrar y volver a cifrar esos datos.
+
+El botón demo del login productivo requiere `DEMO_SESSIONS_ENABLED=true` en el
+`.env` del servidor; por defecto se mantiene desactivado. Cada sesión crea una
+farmacia aislada con cuentas aleatorias y se purga al vencer. El límite es de 60
+minutos por defecto y el recolector revisa sesiones vencidas cada cinco minutos.
+No reutilices ni publiques las credenciales temporales que se muestran en el login.
 
 ### 1.3 Ajustes previos al despliegue ✅ YA APLICADOS EN EL REPOSITORIO
 Los siguientes ajustes ya están hechos en el `docker-compose.yml` actual; verifícalos con `git diff`:

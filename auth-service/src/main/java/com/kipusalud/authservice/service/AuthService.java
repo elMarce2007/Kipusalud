@@ -8,6 +8,7 @@ import com.kipusalud.authservice.entity.Farmacia;
 import com.kipusalud.authservice.dto.CrearUsuarioRequest;
 import com.kipusalud.authservice.dto.UsuarioDto;
 import com.kipusalud.authservice.repository.FarmaciaRepository;
+import com.kipusalud.authservice.repository.DemoSessionRepository;
 import com.kipusalud.authservice.repository.UsuarioRepository;
 import com.kipusalud.authservice.util.JwtUtil;
 import com.kipusalud.authservice.dto.ActualizarFarmaciaRequest;
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
@@ -30,15 +32,18 @@ public class AuthService {
 
     private final UsuarioRepository usuarioRepository;
     private final FarmaciaRepository farmaciaRepository;
+    private final DemoSessionRepository demoSessionRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
 
     public AuthService(UsuarioRepository usuarioRepository, FarmaciaRepository farmaciaRepository,
+                       DemoSessionRepository demoSessionRepository,
                        PasswordEncoder passwordEncoder,
                        AuthenticationManager authenticationManager, JwtUtil jwtUtil) {
         this.usuarioRepository = usuarioRepository;
         this.farmaciaRepository = farmaciaRepository;
+        this.demoSessionRepository = demoSessionRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
@@ -179,8 +184,13 @@ public class AuthService {
 
     private LoginResponse loginResponse(Usuario usuario, Farmacia farmacia) {
         Set<String> permissions = RolePermissions.effectivePermissions(usuario.getRol(), usuario.getPermisos());
-        String token = jwtUtil.generateToken(
-                usuario.getUsername(), usuario.getRol(), farmacia.getId(), permissions);
+        Instant sessionExpiry = demoSessionRepository.findByFarmaciaId(farmacia.getId())
+                .map(session -> session.getExpiraEn())
+                .orElse(null);
+        String token = sessionExpiry == null
+                ? jwtUtil.generateToken(usuario.getUsername(), usuario.getRol(), farmacia.getId(), permissions)
+                : jwtUtil.generateToken(usuario.getUsername(), usuario.getRol(), farmacia.getId(), permissions,
+                        sessionExpiry);
         return new LoginResponse(token, usuario.getUsername(), usuario.getRol(),
                 farmacia.getId(), farmacia.getNombre(), farmacia.getCodigo(), permissions);
     }

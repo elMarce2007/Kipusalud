@@ -12,4 +12,5 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     boolean existsByUsername(String username);
     List<Usuario> findAllByFarmaciaIdOrderByUsername(Long farmaciaId);
     boolean existsByFarmaciaIdAndUsername(Long farmaciaId, String username);
+    List<Usuario> findAllByFarmaciaId(Long farmaciaId);
 }
