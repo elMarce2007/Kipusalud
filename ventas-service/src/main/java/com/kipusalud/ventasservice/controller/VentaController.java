@@ -4,7 +4,10 @@ import com.kipusalud.ventasservice.dto.VentaDto;
 import com.kipusalud.ventasservice.dto.ComprobanteElectronicoDto;
 import com.kipusalud.ventasservice.dto.SunatConfiguracionDto;
 import com.kipusalud.ventasservice.dto.SunatConfiguracionRequest;
+import com.kipusalud.ventasservice.dto.CredencialesSunatRequest;
+import com.kipusalud.ventasservice.dto.OpcionesComprobanteDto;
 import com.kipusalud.ventasservice.service.FacturaSunatService;
+import com.kipusalud.ventasservice.service.RegistroVentaService;
 import com.kipusalud.ventasservice.service.SunatConfiguracionService;
 import com.kipusalud.ventasservice.service.VentaService;
 import org.springframework.http.HttpStatus;
@@ -22,15 +25,18 @@ public class VentaController {
     private final VentaService ventaService;
     private final FacturaSunatService facturaSunatService;
     private final SunatConfiguracionService sunatConfiguracionService;
+    private final RegistroVentaService registroVentaService;
 
     public VentaController(
             VentaService ventaService,
             FacturaSunatService facturaSunatService,
-            SunatConfiguracionService sunatConfiguracionService
+            SunatConfiguracionService sunatConfiguracionService,
+            RegistroVentaService registroVentaService
     ) {
         this.ventaService = ventaService;
         this.facturaSunatService = facturaSunatService;
         this.sunatConfiguracionService = sunatConfiguracionService;
+        this.registroVentaService = registroVentaService;
     }
 
     @GetMapping
@@ -45,14 +51,14 @@ public class VentaController {
 
     @PostMapping
     public ResponseEntity<VentaDto> crear(@RequestBody VentaDto dto) {
-        VentaDto venta = ventaService.crear(dto);
+        VentaDto venta = registroVentaService.registrar(dto);
         return ResponseEntity.status("CONFIRMADA".equals(venta.estado())
                 ? HttpStatus.CREATED : HttpStatus.ACCEPTED).body(venta);
     }
 
     @PostMapping("/{id}/reintentar")
     public ResponseEntity<VentaDto> reintentar(@PathVariable Long id) {
-        return ResponseEntity.ok(ventaService.reintentar(id));
+        return ResponseEntity.ok(registroVentaService.reintentar(id));
     }
 
     @GetMapping("/facturacion/configuracion")
@@ -60,11 +66,25 @@ public class VentaController {
         return ResponseEntity.ok(sunatConfiguracionService.obtener());
     }
 
+    /** Perfil fiscal de la farmacia (emisor y series). No recibe secretos. */
     @PutMapping("/facturacion/configuracion")
     public ResponseEntity<SunatConfiguracionDto> guardarConfiguracionSunat(
             @RequestBody SunatConfiguracionRequest request
     ) {
-        return ResponseEntity.ok(sunatConfiguracionService.guardar(request));
+        return ResponseEntity.ok(sunatConfiguracionService.guardarPerfil(request));
+    }
+
+    @PutMapping("/facturacion/configuracion/credenciales")
+    public ResponseEntity<SunatConfiguracionDto> guardarCredencialesSunat(
+            @RequestBody CredencialesSunatRequest request
+    ) {
+        return ResponseEntity.ok(sunatConfiguracionService.guardarCredenciales(request));
+    }
+
+    /** Comprobantes disponibles para el punto de venta; sin datos secretos. */
+    @GetMapping("/facturacion/opciones")
+    public ResponseEntity<OpcionesComprobanteDto> opcionesComprobante() {
+        return ResponseEntity.ok(sunatConfiguracionService.opciones());
     }
 
     @PostMapping("/{id}/factura-electronica")

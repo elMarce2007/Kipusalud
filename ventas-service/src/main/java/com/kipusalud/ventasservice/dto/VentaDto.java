@@ -17,6 +17,10 @@ public record VentaDto(
         String pagoConfirmadoPor,
         LocalDateTime pagoConfirmadoEn,
         String claveIdempotencia,
-        String estado
+        String estado,
+        /** BOLETA_INTERNA (por defecto), BOLETA_ELECTRONICA o FACTURA. */
+        String tipoComprobante,
+        String serieComprobante,
+        String numeroComprobante
 ) {
 }

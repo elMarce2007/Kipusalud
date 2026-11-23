@@ -40,16 +40,28 @@ public class SunatConfiguracion {
     @Column(name = "siguiente_numero", nullable = false)
     private Long siguienteNumero = 1L;
 
-    @Column(name = "sol_usuario_cifrado", nullable = false, columnDefinition = "bytea")
+    @Column(name = "serie_boleta", length = 4)
+    private String serieBoleta;
+
+    @Column(name = "siguiente_numero_boleta", nullable = false)
+    private Long siguienteNumeroBoleta = 1L;
+
+    @Column(length = 30)
+    private String telefono;
+
+    @Column(length = 120)
+    private String email;
+
+    @Column(name = "sol_usuario_cifrado", columnDefinition = "bytea")
     private byte[] solUsuarioCifrado;
 
-    @Column(name = "sol_clave_cifrada", nullable = false, columnDefinition = "bytea")
+    @Column(name = "sol_clave_cifrada", columnDefinition = "bytea")
     private byte[] solClaveCifrada;
 
-    @Column(name = "certificado_cifrado", nullable = false, columnDefinition = "bytea")
+    @Column(name = "certificado_cifrado", columnDefinition = "bytea")
     private byte[] certificadoCifrado;
 
-    @Column(name = "certificado_clave_cifrada", nullable = false, columnDefinition = "bytea")
+    @Column(name = "certificado_clave_cifrada", columnDefinition = "bytea")
     private byte[] certificadoClaveCifrada;
 
     public Long getFarmaciaId() { return farmaciaId; }
@@ -72,6 +84,21 @@ public class SunatConfiguracion {
     public void setSerieFactura(String serieFactura) { this.serieFactura = serieFactura; }
     public Long getSiguienteNumero() { return siguienteNumero; }
     public void setSiguienteNumero(Long siguienteNumero) { this.siguienteNumero = siguienteNumero; }
+    public String getSerieBoleta() { return serieBoleta; }
+    public void setSerieBoleta(String serieBoleta) { this.serieBoleta = serieBoleta; }
+    public Long getSiguienteNumeroBoleta() { return siguienteNumeroBoleta; }
+    public void setSiguienteNumeroBoleta(Long siguienteNumeroBoleta) { this.siguienteNumeroBoleta = siguienteNumeroBoleta; }
+    public String getTelefono() { return telefono; }
+    public void setTelefono(String telefono) { this.telefono = telefono; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+
+    /** Las credenciales SOL y el certificado se registran aparte del perfil fiscal. */
+    public boolean tieneCredenciales() {
+        return solUsuarioCifrado != null && solClaveCifrada != null
+                && certificadoCifrado != null && certificadoClaveCifrada != null;
+    }
+
     public byte[] getSolUsuarioCifrado() { return solUsuarioCifrado; }
     public void setSolUsuarioCifrado(byte[] solUsuarioCifrado) { this.solUsuarioCifrado = solUsuarioCifrado; }
     public byte[] getSolClaveCifrada() { return solClaveCifrada; }

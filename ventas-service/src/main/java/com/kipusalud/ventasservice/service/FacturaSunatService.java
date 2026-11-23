@@ -36,8 +36,9 @@ public class FacturaSunatService {
     }
 
     public ComprobanteElectronicoDto emitir(Long ventaId) {
-        ClienteClient.ClienteDto cliente = clienteClient.obtenerCliente(
-                ventaClienteId(ventaId));
+        Long clienteId = ventaClienteId(ventaId);
+        // Las boletas pueden emitirse sin cliente ("Público general").
+        ClienteClient.ClienteDto cliente = clienteId == null ? null : clienteClient.obtenerCliente(clienteId);
         FacturaPersistenceService.PreparedInvoice prepared = persistence.preparar(ventaId, cliente);
         ComprobanteElectronico existing = prepared.comprobante();
         if (!"PREPARADA".equals(existing.getEstado())) {

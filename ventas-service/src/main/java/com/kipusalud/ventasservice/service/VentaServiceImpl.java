@@ -7,7 +7,9 @@ import com.kipusalud.ventasservice.dto.DetalleVentaDto;
 import com.kipusalud.ventasservice.dto.SalidaVentaRequest;
 import com.kipusalud.ventasservice.dto.VentaDto;
 import com.kipusalud.ventasservice.entity.DetalleVenta;
+import com.kipusalud.ventasservice.entity.CorrelativoComprobante;
 import com.kipusalud.ventasservice.entity.Venta;
+import com.kipusalud.ventasservice.repository.CorrelativoComprobanteRepository;
 import com.kipusalud.ventasservice.repository.VentaRepository;
 import com.kipusalud.security.TenantContext;
 import org.springframework.http.HttpStatus;
@@ -29,12 +31,20 @@ import java.util.stream.Collectors;
 @Service
 public class VentaServiceImpl implements VentaService {
 
+    public static final String BOLETA_INTERNA = "BOLETA_INTERNA";
+    public static final String BOLETA_ELECTRONICA = "BOLETA_ELECTRONICA";
+    public static final String FACTURA = "FACTURA";
+    /** Serie de la boleta interna; distinta de las series electrónicas B### y F###. */
+    public static final String SERIE_INTERNA = "I001";
+
     private final VentaRepository ventaRepository;
     private final SocketNotificationServer socketNotificationServer;
     private final CatalogoClient catalogoClient;
     private final ClienteClient clienteClient;
     private final ObjectMapper objectMapper;
     private final DomainEventOutbox domainEventOutbox;
+    private final SunatConfiguracionService sunatConfiguracionService;
+    private final CorrelativoComprobanteRepository correlativoRepository;
 
     public VentaServiceImpl(
             VentaRepository ventaRepository,
@@ -42,7 +52,9 @@ public class VentaServiceImpl implements VentaService {
             CatalogoClient catalogoClient,
             ClienteClient clienteClient,
             ObjectMapper objectMapper,
-            DomainEventOutbox domainEventOutbox
+            DomainEventOutbox domainEventOutbox,
+            SunatConfiguracionService sunatConfiguracionService,
+            CorrelativoComprobanteRepository correlativoRepository
     ) {
         this.ventaRepository = ventaRepository;
         this.socketNotificationServer = socketNotificationServer;
@@ -50,6 +62,8 @@ public class VentaServiceImpl implements VentaService {
         this.clienteClient = clienteClient;
         this.objectMapper = objectMapper;
         this.domainEventOutbox = domainEventOutbox;
+        this.sunatConfiguracionService = sunatConfiguracionService;
+        this.correlativoRepository = correlativoRepository;
     }
 
     @Override
@@ -86,8 +100,10 @@ public class VentaServiceImpl implements VentaService {
         if (dto.detalles() == null || dto.detalles().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La venta debe incluir productos");
         }
-        if (dto.clienteId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La venta requiere un cliente");
+        String tipoComprobante = validarTipoComprobante(dto.tipoComprobante());
+        if (FACTURA.equals(tipoComprobante) && dto.clienteId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La factura requiere un cliente con RUC");
         }
         Map<Long, Integer> cantidadesPorProducto = new TreeMap<>();
         for (DetalleVentaDto detalle : dto.detalles()) {
@@ -115,7 +131,8 @@ public class VentaServiceImpl implements VentaService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "La confirmación manual solo aplica a pagos externos");
         }
-        String huella = huellaSolicitud(dto, cantidadesPorProducto, metodoPago, confirmacionManualPago);
+        String huella = huellaSolicitud(dto, cantidadesPorProducto, metodoPago, confirmacionManualPago,
+                tipoComprobante);
         Long farmaciaId = TenantContext.requireFarmaciaId();
         var existente = ventaRepository.findByFarmaciaIdAndClaveIdempotencia(farmaciaId, claveIdempotencia);
         if (existente.isPresent()) {
@@ -130,7 +147,15 @@ public class VentaServiceImpl implements VentaService {
             return confirmarSalidaYVenta(ventaExistente, cantidadesPorProducto);
         }
 
-        clienteClient.validarCliente(dto.clienteId());
+        if (!BOLETA_INTERNA.equals(tipoComprobante)) {
+            sunatConfiguracionService.validarEmisionDisponible(farmaciaId,
+                    FACTURA.equals(tipoComprobante) ? "01" : "03");
+        }
+        ClienteClient.ClienteDto cliente = dto.clienteId() == null
+                ? null : clienteClient.obtenerCliente(dto.clienteId());
+        if (FACTURA.equals(tipoComprobante)) {
+            validarClienteFactura(cliente);
+        }
         Map<Long, CatalogoClient.ProductoCatalogo> productos = cantidadesPorProducto.keySet().stream()
                 .map(catalogoClient::obtenerProducto)
                 .collect(Collectors.toMap(CatalogoClient.ProductoCatalogo::id, producto -> producto));
@@ -153,6 +178,7 @@ public class VentaServiceImpl implements VentaService {
         venta.setClaveIdempotencia(claveIdempotencia);
         venta.setHuellaSolicitud(huella);
         venta.setEstado("PENDIENTE_STOCK");
+        venta.setTipoComprobante(tipoComprobante);
 
         List<DetalleVenta> detalles = dto.detalles().stream().map(d -> {
             BigDecimal precio = productos.get(d.productoId()).precio();
@@ -177,6 +203,12 @@ public class VentaServiceImpl implements VentaService {
                 .map(DetalleVenta::getSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         venta.setTotal(total);
+        if (BOLETA_ELECTRONICA.equals(tipoComprobante)
+                && total.compareTo(SunatConfiguracionService.MONTO_MINIMO_BOLETA_CON_DOCUMENTO) >= 0
+                && (cliente == null || cliente.dni() == null || !cliente.dni().trim().matches("\\d{8}"))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Una boleta electrónica desde S/ 700 requiere un cliente con DNI");
+        }
 
         BigDecimal montoRecibido = metodoPago.equals("EFECTIVO")
                 ? validarPagoEfectivo(dto.montoRecibido(), total)
@@ -202,10 +234,14 @@ public class VentaServiceImpl implements VentaService {
                 .toList();
         catalogoClient.descontarPorLotes(venta.getClaveIdempotencia(), lineas);
         venta.setEstado("CONFIRMADA");
+        if (BOLETA_INTERNA.equals(venta.getTipoComprobante()) && venta.getNumeroComprobante() == null) {
+            asignarNumeroInterno(venta);
+        }
         Venta confirmada = ventaRepository.saveAndFlush(venta);
         domainEventOutbox.record("venta.confirmada", confirmada.getId(),
                 "sale:" + TenantContext.requireFarmaciaId() + ":" + confirmada.getId(),
                 Map.of("total", confirmada.getTotal(), "metodoPago", confirmada.getMetodoPago(),
+                        "tipoComprobante", confirmada.getTipoComprobante(),
                         "cantidadLineas", confirmada.getDetalles().size(),
                         "productos", confirmada.getDetalles().stream().map(detail -> Map.of(
                                 "productoId", detail.getProductoId(),
@@ -227,12 +263,14 @@ public class VentaServiceImpl implements VentaService {
             VentaDto dto,
             Map<Long, Integer> cantidades,
             String metodoPago,
-            boolean confirmacionManualPago
+            boolean confirmacionManualPago,
+            String tipoComprobante
     ) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(
                     objectMapper.writeValueAsBytes(new SolicitudVentaNormalizada(
-                            dto.clienteId(), metodoPago, dto.montoRecibido(), confirmacionManualPago, cantidades)));
+                            dto.clienteId(), metodoPago, dto.montoRecibido(), confirmacionManualPago, cantidades,
+                            tipoComprobante)));
             return HexFormat.of().formatHex(digest);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("No se pudo normalizar la solicitud de venta", e);
@@ -246,8 +284,45 @@ public class VentaServiceImpl implements VentaService {
             String metodoPago,
             BigDecimal montoRecibido,
             boolean confirmacionManualPago,
-            Map<Long, Integer> cantidades
+            Map<Long, Integer> cantidades,
+            String tipoComprobante
     ) {}
+
+    private String validarTipoComprobante(String tipo) {
+        if (tipo == null || tipo.isBlank()) {
+            return BOLETA_INTERNA;
+        }
+        if (!Set.of(BOLETA_INTERNA, BOLETA_ELECTRONICA, FACTURA).contains(tipo)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El tipo de comprobante no es válido");
+        }
+        return tipo;
+    }
+
+    private void validarClienteFactura(ClienteClient.ClienteDto cliente) {
+        if (cliente == null || cliente.ruc() == null || !cliente.ruc().trim().matches("\\d{11}")
+                || cliente.razonSocial() == null || cliente.razonSocial().isBlank()
+                || cliente.direccionFiscal() == null || cliente.direccionFiscal().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La factura requiere un cliente con RUC, razón social y dirección fiscal");
+        }
+    }
+
+    /** Numeración correlativa de la boleta interna, con bloqueo para ventas simultáneas. */
+    private void asignarNumeroInterno(Venta venta) {
+        Long farmaciaId = venta.getFarmaciaId();
+        correlativoRepository.crearSiNoExiste(farmaciaId, SERIE_INTERNA);
+        CorrelativoComprobante correlativo = correlativoRepository.findForUpdate(farmaciaId, SERIE_INTERNA)
+                .orElseThrow(() -> new IllegalStateException("No se pudo reservar el correlativo interno"));
+        long numero = correlativo.getSiguienteNumero();
+        if (numero > 99_999_999L) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "La serie de boletas internas agotó su correlativo de ocho dígitos");
+        }
+        correlativo.setSiguienteNumero(numero + 1);
+        correlativoRepository.save(correlativo);
+        venta.setSerieComprobante(SERIE_INTERNA);
+        venta.setNumeroComprobante("%08d".formatted(numero));
+    }
 
     private String validarMetodoPago(String metodoPago) {
         if (metodoPago == null
@@ -268,11 +343,13 @@ public class VentaServiceImpl implements VentaService {
     private VentaDto toDto(Venta v) {
         List<DetalleVentaDto> detallesDto = v.getDetalles().stream()
                 .map(d -> new DetalleVentaDto(d.getId(), d.getProductoId(), d.getCantidad(),
-                        d.getPrecioUnitario(), d.getSubtotal()))
+                        d.getPrecioUnitario(), d.getSubtotal(), d.getNombreProducto(),
+                        d.getAfectacionIgv(), d.getPrecioIncluyeIgv()))
                 .collect(Collectors.toList());
         return new VentaDto(v.getId(), v.getFecha(), v.getClienteId(), v.getTotal(), detallesDto,
                 v.getMetodoPago(), v.getMontoRecibido(), v.getVuelto(),
                 v.isConfirmacionManualPago(), v.getPagoConfirmadoPor(), v.getPagoConfirmadoEn(),
-                v.getClaveIdempotencia(), v.getEstado());
+                v.getClaveIdempotencia(), v.getEstado(), v.getTipoComprobante(),
+                v.getSerieComprobante(), v.getNumeroComprobante());
     }
 }

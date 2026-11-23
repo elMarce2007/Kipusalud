@@ -9,5 +9,8 @@ public record SunatConfiguracionDto(
         String provincia,
         String distrito,
         String serieFactura,
+        String serieBoleta,
+        String telefono,
+        String email,
         boolean credencialesConfiguradas
 ) {}

@@ -49,8 +49,9 @@ public class FacturaPersistenceService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Venta no encontrada"));
         if (!"CONFIRMADA".equals(venta.getEstado())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Solo se puede emitir una factura para una venta confirmada");
+                    "Solo se puede emitir un comprobante para una venta confirmada");
         }
+        String tipoSunat = tipoSunat(venta);
         SunatConfiguracion config = configuracionRepository.findForUpdate(farmaciaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.PRECONDITION_FAILED,
                         "Configure los datos fiscales y las credenciales de SUNAT para esta farmacia"));
@@ -67,27 +68,42 @@ public class FacturaPersistenceService {
                     zip(comprobante.getNombreArchivo(), comprobante.getXmlFirmado()));
         }
 
-        long nextNumber = config.getSiguienteNumero() == null ? 1 : config.getSiguienteNumero();
+        String serie = SunatConfiguracionService.serie(config, tipoSunat);
+        if (serie == null || serie.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.PRECONDITION_FAILED,
+                    "La farmacia no tiene configurada la serie de este comprobante");
+        }
+        boolean boleta = "03".equals(tipoSunat);
+        Long siguiente = boleta ? config.getSiguienteNumeroBoleta() : config.getSiguienteNumero();
+        long nextNumber = siguiente == null ? 1 : siguiente;
         if (nextNumber > 99_999_999L) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "La serie de facturación agotó su correlativo de ocho dígitos");
+                    "La serie " + serie + " agotó su correlativo de ocho dígitos");
         }
         String number = "%08d".formatted(nextNumber);
-        String fileName = config.getRuc() + "-01-" + config.getSerieFactura() + "-" + number;
+        String fileName = config.getRuc() + "-" + tipoSunat + "-" + serie + "-" + number;
         SunatConfiguracionService.Credentials credentials = configuracionService.decryptCredentials(config);
 
         ComprobanteElectronico comprobante = new ComprobanteElectronico();
         comprobante.setFarmaciaId(farmaciaId);
         comprobante.setVentaId(ventaId);
-        comprobante.setSerie(config.getSerieFactura());
+        comprobante.setTipoComprobante(tipoSunat);
+        comprobante.setSerie(serie);
         comprobante.setNumero(number);
         comprobante.setNombreArchivo(fileName + ".zip");
         comprobante.setEstado("PREPARADA");
         comprobante.setFechaCreacion(LocalDateTime.now());
         comprobante.setXmlFirmado(xmlGenerator.generateAndSign(venta, config, credentials, comprobante, cliente));
         comprobante = comprobanteRepository.saveAndFlush(comprobante);
-        config.setSiguienteNumero(nextNumber + 1);
+        if (boleta) {
+            config.setSiguienteNumeroBoleta(nextNumber + 1);
+        } else {
+            config.setSiguienteNumero(nextNumber + 1);
+        }
         configuracionRepository.save(config);
+        venta.setSerieComprobante(serie);
+        venta.setNumeroComprobante(number);
+        ventaRepository.save(venta);
         return new PreparedInvoice(comprobante, config.getRuc(), credentials,
                 zip(comprobante.getNombreArchivo(), comprobante.getXmlFirmado()));
     }
@@ -148,6 +164,16 @@ public class FacturaPersistenceService {
 
     public SunatConfiguracionService.Credentials descifrarCredenciales(SunatConfiguracion config) {
         return configuracionService.decryptCredentials(config);
+    }
+
+    /** Tipo SUNAT según el comprobante elegido al vender: 01 factura, 03 boleta electrónica. */
+    private String tipoSunat(Venta venta) {
+        return switch (venta.getTipoComprobante() == null ? "" : venta.getTipoComprobante()) {
+            case VentaServiceImpl.FACTURA -> "01";
+            case VentaServiceImpl.BOLETA_ELECTRONICA -> "03";
+            default -> throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Esta venta se registró con boleta interna; no se envía a SUNAT");
+        };
     }
 
     private ComprobanteElectronico findByIdAndTenant(Long id) {

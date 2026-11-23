@@ -1,8 +1,11 @@
 # Emisión electrónica SUNAT
 
-El módulo inicial implementa facturas de venta (tipo `01`) por el SEE del
-contribuyente: genera XML UBL 2.1, lo firma con un certificado PKCS#12,
-lo empaqueta en ZIP y usa `sendBill` de SOAP 1.1. El entorno predeterminado es
+Al registrar una venta se elige el **comprobante de pago**: boleta interna (no va a
+SUNAT, correlativo `I001-…`), boleta electrónica (tipo `03`) o factura (tipo `01`).
+Los electrónicos se emiten por el SEE del contribuyente apenas la venta se confirma:
+se genera XML UBL 2.1, se firma con un certificado PKCS#12, se empaqueta en ZIP y se
+usa `sendBill` de SOAP 1.1. La boleta electrónica se envía de forma individual
+(sin resumen diario); **verificar en el beta de SUNAT antes de usarla en producción**. El entorno predeterminado es
 beta. La URL de producción no está configurada y la emisión en producción
 permanece desactivada deliberadamente.
 
@@ -23,14 +26,18 @@ producción.
 
 ## Configuración por farmacia
 
-Un usuario con rol `ADMINISTRADOR` o `QF_REGENTE` guarda los datos del emisor y
-credenciales en `PUT /api/ventas/facturacion/configuracion`. El JSON requiere:
+El administrador lo configura en la interfaz en **Administración → Datos fiscales y
+SUNAT**, en dos pasos independientes (la API también admite `QF_REGENTE`):
 
-- `ruc`, `razonSocial`, `direccionFiscal`
-- `ubigeo`, `departamento`, `provincia`, `distrito`
-- `serieFactura` con formato `F###`
-- `usuarioSol`, `claveSol`
-- `certificadoPkcs12Base64`, `claveCertificado`
+1. `PUT /api/ventas/facturacion/configuracion` — perfil fiscal: `ruc`, `razonSocial`,
+   `direccionFiscal`, `ubigeo`, `departamento`, `provincia`, `distrito`,
+   `serieFactura` (`F###`), `serieBoleta` (`B###`), y opcionales `telefono`, `email`.
+2. `PUT /api/ventas/facturacion/configuracion/credenciales` — `usuarioSol`,
+   `claveSol`, `certificadoPkcs12Base64`, `claveCertificado`.
+
+Mientras falte alguno de los dos, el punto de venta solo ofrece la boleta interna.
+Al cambiar una serie, la numeración continúa después del último comprobante emitido
+en ella.
 
 El servicio valida que el archivo sea PKCS#12 e incluya una clave privada.
 Credenciales y certificado se cifran con AES-256-GCM antes de persistirlos.
@@ -44,8 +51,11 @@ La respuesta de configuración no contiene secretos.
   `30` (inafecto, operación onerosa). Se establecen en la API de productos;
   empleados no pueden cambiarlos. Otros códigos de afectación aún no se
   admiten.
-- Cada cliente receptor necesita `ruc` de 11 dígitos, `razonSocial` y
+- Factura: el cliente necesita `ruc` de 11 dígitos, `razonSocial` y
   `direccionFiscal`, campos disponibles en el API de clientes.
+- Boleta electrónica: cliente opcional; sin cliente se emite a "clientes varios"
+  (catálogo 06, código `-`), permitido solo por debajo de S/ 700. Desde S/ 700 se
+  exige un cliente con DNI.
 - Solo se emiten ventas con estado `CONFIRMADA`; las ventas antiguas sin
   snapshots tributarios de sus líneas no son facturables.
 

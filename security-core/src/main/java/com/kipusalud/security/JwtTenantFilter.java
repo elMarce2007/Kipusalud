@@ -102,7 +102,7 @@ final class JwtTenantFilter extends OncePerRequestFilter {
     private boolean requiresAdministratorOrPharmacist(HttpServletRequest request) {
         String path = request.getRequestURI();
         return path.startsWith("/ws")
-                || path.matches("/api/ventas/facturacion/configuracion/?")
+                || path.matches("/api/ventas/facturacion/configuracion(/credenciales)?/?")
                 || path.matches("/api/clientes/[^/]+/informacion-clinica/?");
     }
 
@@ -123,7 +123,7 @@ final class JwtTenantFilter extends OncePerRequestFilter {
         } else if (path.startsWith("/api/inventario")) {
             module = "INVENTARIO";
         } else if (path.startsWith("/api/ventas")) {
-            if (path.matches("/api/ventas/facturacion/configuracion/?")) {
+            if (path.matches("/api/ventas/facturacion/configuracion(/credenciales)?/?")) {
                 return null;
             }
             module = "VENTAS";

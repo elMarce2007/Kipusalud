@@ -76,6 +76,13 @@ export const routes: Routes = [
         data: { permission: 'FARMACIA:VER' }
       },
       {
+        path: 'administracion/facturacion',
+        loadComponent: () => import('./features/facturacion/facturacion.component')
+          .then(m => m.FacturacionComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['ADMINISTRADOR'] }
+      },
+      {
         path: 'administracion',
         loadComponent: () => import('./features/administracion/administracion.component')
           .then(m => m.AdministracionComponent),

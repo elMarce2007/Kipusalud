@@ -61,6 +61,7 @@ public class ComprobanteElectronico {
     public Long getVentaId() { return ventaId; }
     public void setVentaId(Long ventaId) { this.ventaId = ventaId; }
     public String getTipoComprobante() { return tipoComprobante; }
+    public void setTipoComprobante(String tipoComprobante) { this.tipoComprobante = tipoComprobante; }
     public String getSerie() { return serie; }
     public void setSerie(String serie) { this.serie = serie; }
     public String getNumero() { return numero; }

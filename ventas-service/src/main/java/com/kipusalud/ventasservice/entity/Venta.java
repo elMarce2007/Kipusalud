@@ -17,7 +17,8 @@ public class Venta {
     @Column(nullable = false)
     private LocalDateTime fecha;
 
-    @Column(nullable = false)
+    /** Opcional en boletas ("Público general"); obligatorio en facturas. */
+    @Column(name = "cliente_id")
     private Long clienteId;
 
     @Column(nullable = false)
@@ -53,6 +54,15 @@ public class Venta {
     @Column(nullable = false, length = 30)
     private String estado;
 
+    @Column(name = "tipo_comprobante", nullable = false, length = 20)
+    private String tipoComprobante = "BOLETA_INTERNA";
+
+    @Column(name = "serie_comprobante", length = 4)
+    private String serieComprobante;
+
+    @Column(name = "numero_comprobante", length = 8)
+    private String numeroComprobante;
+
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinTable(
             name = "ventas_detalles",
@@ -62,6 +72,13 @@ public class Venta {
     private List<DetalleVenta> detalles = new ArrayList<>();
 
     public Venta() {}
+
+    public String getTipoComprobante() { return tipoComprobante; }
+    public void setTipoComprobante(String tipoComprobante) { this.tipoComprobante = tipoComprobante; }
+    public String getSerieComprobante() { return serieComprobante; }
+    public void setSerieComprobante(String serieComprobante) { this.serieComprobante = serieComprobante; }
+    public String getNumeroComprobante() { return numeroComprobante; }
+    public void setNumeroComprobante(String numeroComprobante) { this.numeroComprobante = numeroComprobante; }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
