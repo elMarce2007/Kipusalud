@@ -37,11 +37,11 @@ docker logs --since 15m kipusalud-auth
 ```
 
 Si se modificó frontend o gateway, **no hagas `git pull` directamente en el
-servidor**: su `docker-compose.yml` tiene cambios locales no versionados (Aurora)
+servidor**: su `docker-compose.yml` tiene cambios locales no versionados (endpoint de RDS)
 y hay respaldos que deben preservarse. Primero sigue el
 [procedimiento de despliegue seguro](./operaciones.md#procedimiento-de-despliegue-seguro)
 y la [guía de infraestructura](./infraestructura-aws.md): revisa branch, commit
-y `git status --short`, y acuerda cómo conservar la configuración de Aurora.
+y `git status --short`, y acuerda cómo conservar la configuración de RDS.
 
 Solo con autorización expresa y el código ya actualizado, reconstruye en forma
 secuencial para no saturar la instancia:

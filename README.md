@@ -4,7 +4,7 @@ Sistema web de gestión de farmacias: Angular en el navegador y servicios Spring
 Boot independientes, comunicados por un API Gateway, Eureka, HTTP interno y
 RabbitMQ. La persistencia está separada por servicio. El repositorio incluye
 Docker Compose para desarrollo y el despliegue EC2; el entorno AWS actual usa
-Aurora PostgreSQL.
+Amazon RDS for PostgreSQL.
 
 ## Para empezar
 
@@ -14,7 +14,7 @@ Aurora PostgreSQL.
 - [Referencia de API](docs/referencia-api.md)
 - [Modelo de datos y migraciones](docs/modelo-datos.md)
 - [Ejecución, configuración y AWS](docs/operaciones.md)
-- [Estructura AWS EC2 + Aurora/RDS para agentes](docs/infraestructura-aws.md)
+- [Estructura AWS EC2 + RDS PostgreSQL para agentes](docs/infraestructura-aws.md)
 - [Documentación de emisión electrónica SUNAT](docs/sunat-electronic-invoicing.md)
 - [Guía de despliegue AWS histórica](docs/guia-despliegue-aws.md)
 - [Bitácora de troubleshooting de conexión](docs/troubleshooting-snackbar-conexion.md)

@@ -48,10 +48,15 @@ sus pasos siguen describiendo AWS.
 
 ## AWS: advertencia de divergencia
 
-En la inspección documentada el 2026-11-23, EC2 ejecutaba el código `7dd684f`,
-pero el worktree remoto estaba modificado: el `docker-compose.yml` local del
-servidor apuntaba a Aurora y había archivos no versionados de respaldo. Esa
-configuración de Aurora no forma parte del `docker-compose.yml` de Git.
+La base de datos es una instancia **Amazon RDS for PostgreSQL 18.3**, no Aurora.
+
+En la inspección del 2026-11-23, el worktree de Git en EC2 estaba en `7dd684f` y
+modificado: el `docker-compose.yml` local del servidor apunta a la instancia RDS
+y hay archivos no versionados de respaldo. Esa configuración de RDS no forma
+parte del `docker-compose.yml` de Git. Además, `ventas-service` y `frontend` se
+desplegaron después por imagen desde `a94ad3d` (sin `git pull`), así que el
+código en ejecución no coincide con el worktree del servidor; ver
+[operaciones](docs/operaciones.md#despliegue-realizado-el-2026-11-23).
 
 Antes de `git pull`, build o despliegue en el servidor:
 
@@ -62,7 +67,7 @@ Antes de `git pull`, build o despliegue en el servidor:
 4. Verifica destino de base de datos, migraciones y salud antes de reiniciar
    servicios.
 
-Los detalles variables de Aurora, red, IAM, DNS y secretos deben consultarse en
+Los detalles variables de RDS, red, IAM, DNS y secretos deben consultarse en
 la cuenta/configuración autorizada, no inferirse de esta instantánea.
 Para el mapa de EC2/Compose/RDS y el inventario de solo lectura, sigue
 [infraestructura-aws.md](docs/infraestructura-aws.md).

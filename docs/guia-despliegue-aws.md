@@ -1,7 +1,7 @@
 # Guía de Despliegue de KipuSalud en AWS
 
 > **Guía histórica, no ejecutar literalmente.** El estado inspeccionado el
-> 2026-11-23 usa Aurora PostgreSQL y un `docker-compose.yml` modificado localmente
+> 2026-11-23 usa Amazon RDS for PostgreSQL y un `docker-compose.yml` modificado localmente
 > en el servidor; este documento contiene instrucciones anteriores. Consulta
 > [operaciones.md](./operaciones.md) y la [guía de infraestructura EC2/RDS](./infraestructura-aws.md)
 > antes de cualquier build, pull o despliegue.

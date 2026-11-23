@@ -13,7 +13,7 @@ repo `main`, commit `7dd684f`. El código/configuración puede cambiar después.
 3. [Contratos REST, SOAP y rutas de interfaz](referencia-api.md).
 4. [Entidades, bases y migraciones](modelo-datos.md).
 5. [Ejecución local, Docker, configuración y estado AWS](operaciones.md).
-6. [Topología EC2 + Aurora/RDS y runbook de solo lectura](infraestructura-aws.md).
+6. [Topología EC2 + RDS PostgreSQL y runbook de solo lectura](infraestructura-aws.md).
 7. La página especializada necesaria: [SUNAT](sunat-electronic-invoicing.md),
    [troubleshooting de API](troubleshooting-snackbar-conexion.md) o
    [casos de uso/entregables](entregables-uml-kipusalud.md).
@@ -54,7 +54,7 @@ flowchart LR
   Gateway --> Sales[Ventas y SUNAT :8084]
   Gateway --> Staff[Personal :8085]
   Gateway --> Audit[Auditoría :8086]
-  Auth --> DB[(Aurora PostgreSQL en AWS)]
+  Auth --> DB[(RDS PostgreSQL en AWS)]
   Customer --> DB
   Catalog --> DB
   Sales --> DB
@@ -75,7 +75,7 @@ flowchart LR
 El dibujo muestra relaciones lógicas, no implica que todos los servicios
 compartan una única base física. Localmente Compose define seis bases
 PostgreSQL separadas; en AWS, la instantánea inspeccionada conectaba cada
-servicio a la misma instancia/cluster Aurora y seleccionaba una base lógica
+servicio a la misma instancia RDS PostgreSQL y seleccionaba una base lógica
 distinta. Ver [operaciones](operaciones.md).
 
 ## Módulos
@@ -147,9 +147,9 @@ validación del backend. Los detalles están en `frontend/src/app/app.routes.ts`
 
 ## Asuntos operativos que requieren atención
 
-1. El estado AWS usa Aurora configurado mediante cambio local no versionado del
+1. El estado AWS usa RDS PostgreSQL configurado mediante cambio local no versionado del
    Compose remoto. El Compose en Git apunta a `psql`; no asumas que un checkout
-   nuevo conserva Aurora.
+   nuevo conserva el endpoint de RDS.
 2. El Compose remoto publica también `8080:8080` en el host. Esto requiere
    comprobar las reglas del Security Group; no equivale por sí solo a confirmar
    acceso desde Internet.

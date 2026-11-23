@@ -125,10 +125,12 @@ pruebas y builds antes del push y comprobar salud después del despliegue.
 - Compose remoto publicaba `80:80` para frontend y `8080:8080` para API Gateway.
   La regla de Security Group no fue consultada, así que el acceso externo al
   puerto 8080 es desconocido y requiere verificación.
-- Aurora PostgreSQL se usa para las seis bases lógicas (`auth_db`,
-  `clientes_db`, `catalogo_db`, `ventas_db`, `personal_db`, `auditoria_db`).
+- Una instancia **Amazon RDS for PostgreSQL 18.3** (no Aurora: `db.t4g.micro`,
+  sin cluster, Single-AZ, cifrada, no pública) aloja las seis bases lógicas
+  (`auth_db`, `clientes_db`, `catalogo_db`, `ventas_db`, `personal_db`,
+  `auditoria_db`). Verificado con `aws rds describe-db-instances`.
 - El `docker-compose.yml` del servidor tiene cambio no versionado que fija el
-  endpoint de Aurora y elimina dependencias del servicio local `psql`. El
+  endpoint de RDS y elimina dependencias del servicio local `psql`. El
   Compose del repositorio sigue usando `psql`. Una actualización de Git no
   reconcilia automáticamente ambas configuraciones.
 - El worktree remoto tenía modificación en `docker-compose.yml` y archivos no
@@ -139,15 +141,31 @@ pruebas y builds antes del push y comprobar salud después del despliegue.
   `/actuator/health` devolvieron `UP`; se verificó un acceso de login inválido
   que llegó a una consulta de DB de auth (401 esperado). No se ejecutó CRUD
   destructivo ni prueba de escritura sobre datos productivos.
-- La configuración exacta de security groups, endpoint de instancia/cluster,
-  certificados, backups automáticos y acceso IAM no quedó verificada por
-  completo. El usuario indicó que Aurora no tiene gateway a Internet ni auth
-  IAM en el asistente de conexión.
+- Respaldos de RDS: automáticos con **retención de 1 día** (ventana
+  05:22–05:52 UTC), protección contra borrado **desactivada**. Antes de la
+  migración `ventas` V9 se tomó el snapshot manual `kipusalud-antes-v9-20261123`.
+  Se recomienda subir la retención (por ejemplo a 7 días) y activar la
+  protección contra borrado.
+- Security groups, certificados y autenticación IAM de la base no se
+  verificaron por completo.
 
-El inventario AWS, diferencias de Compose, topología EC2→Aurora y runbook seguro
+### Despliegue realizado el 2026-11-23
+
+Se desplegaron `ventas-service` y `frontend` del commit `a94ad3d` (merge del PR
+#2) **sin `git pull` en el servidor**: las imágenes se construyeron en local, se
+copiaron con `docker save | ssh … docker load`, se etiquetaron como `latest` y se
+recrearon solo esos contenedores con
+`docker compose up -d --no-deps --no-build <servicio>`. La migración `ventas` V9
+quedó aplicada (`ventas_db` en versión 9). Imágenes anteriores conservadas en el
+servidor: `kipusalud-ventas-service:respaldo-20261123`,
+`kipusalud-frontend:respaldo-20261123` y `kipusalud-frontend:respaldo-p1-20261123`.
+El worktree de Git del servidor sigue en `7dd684f`; no representa el código que
+corre en esos dos contenedores.
+
+El inventario AWS, diferencias de Compose, topología EC2→RDS y runbook seguro
 están en [infraestructura-aws.md](infraestructura-aws.md).
 
-### TLS hacia Aurora
+### TLS hacia RDS
 
 El ejemplo de consola PSQL de AWS usa `sslmode=verify-full` y
 `global-bundle.pem`, pero los URLs JDBC del repositorio no contienen
@@ -166,10 +184,12 @@ Solo desplegar con autorización expresa y después de revisar estado actual:
 2. En servidor: inspeccionar `git status --short`, `git diff -- docker-compose.yml`
    con valores secretos redactados y comprobar respaldos. No sobrescribir
    divergencia local.
-3. Acordar cómo se conserva Aurora al actualizar Compose; no publicar endpoint,
-   password ni TLS CA en Git.
-4. Tomar backup Aurora con retención aprobada y confirmar que su restore es
-   posible antes de migraciones sensibles.
+3. Acordar cómo se conserva el endpoint de RDS al actualizar Compose; no
+   publicar endpoint, password ni TLS CA en Git.
+4. Antes de migraciones: snapshot manual de la instancia RDS
+   (`aws rds create-db-snapshot --region us-east-2 --db-instance-identifier
+   kipusalud-db --db-snapshot-identifier <nombre>`) y esperar `available`.
+   Requiere permisos RDS en el usuario IAM que use la CLI.
 5. Pull fast-forward solo si no hay conflictos locales; construir/recrear solo
    servicios afectados, conservar volúmenes.
 6. Esperar healthchecks, consultar logs sin volcar variables secretas y hacer
@@ -182,7 +202,7 @@ como parte de una documentación o diagnóstico.
 ## Pruebas detectadas en el árbol
 
 - Java: auth, security-core, catálogo y SUNAT tienen pruebas unitarias; no se
-  encontró una suite integral que cubra todos los servicios con Aurora real.
+  encontró una suite integral que cubra todos los servicios con la base RDS real.
 - Angular: cuatro archivos `.spec.ts` detectados en el árbol inspeccionado.
 - Las pruebas E2E Playwright referidas en sesiones previas no se localizaron
   como suite versionada en el repositorio; confirma su ubicación antes de
@@ -203,4 +223,4 @@ como parte de una documentación o diagnóstico.
 - Nginx/API: `environment.prod.ts` debe usar `/api`, proxy al gateway.
 
 Los pasos históricos de AWS en `docs/guia-despliegue-aws.md` pueden preceder a
-Aurora; contrástalos con esta sección y con la configuración en vivo.
+la migración a RDS; contrástalos con esta sección y con la configuración en vivo.
