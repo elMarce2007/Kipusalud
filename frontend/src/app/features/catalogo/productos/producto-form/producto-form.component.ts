@@ -13,7 +13,8 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ProductoService } from '../../../../services/producto.service';
 import { CategoriaService } from '../../../../services/categoria.service';
 import { Categoria } from '../../../../models/categoria.model';
-import { Producto } from '../../../../models/producto.model';
+import { AFECTACIONES_IGV, AfectacionIgv, Producto } from '../../../../models/producto.model';
+import { AuthService } from '../../../../services/auth.service';
 
 @Component({
   selector: 'app-producto-form',
@@ -110,6 +111,38 @@ import { Producto } from '../../../../models/producto.model';
               </mat-form-field>
             </div>
 
+            @if (puedeConfigurarTributos) {
+              <section class="initial-inventory">
+                <h2>Datos tributarios (SUNAT)</h2>
+                <p class="form-help">
+                  Necesarios para incluir este producto en una factura electrónica.
+                </p>
+                <div class="form-grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Afectación IGV</mat-label>
+                    <mat-select formControlName="afectacionIgv">
+                      <mat-option value="">Sin configurar</mat-option>
+                      @for (afectacion of afectaciones; track afectacion.codigo) {
+                        <mat-option [value]="afectacion.codigo">{{ afectacion.etiqueta }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+
+                  @if (form.controls.afectacionIgv.value === '10') {
+                    <label class="inventory-toggle">
+                      <input type="checkbox" formControlName="precioIncluyeIgv">
+                      El precio de venta ya incluye IGV
+                    </label>
+                  }
+                </div>
+              </section>
+            } @else if (id() && !tieneDatosTributarios) {
+              <p class="form-help">
+                Este producto aún no tiene datos tributarios. Pide al administrador o al químico
+                farmacéutico que los configure para poder facturarlo.
+              </p>
+            }
+
             @if (!id()) {
               <section class="initial-inventory">
                 <h2>Existencias iniciales</h2>
@@ -201,6 +234,7 @@ export class ProductoFormComponent implements OnInit {
   private categoriaService = inject(CategoriaService);
   private router = inject(Router);
   private snackBar = inject(MatSnackBar);
+  private authService = inject(AuthService);
 
   id = input<string>();
   loading = signal(false);
@@ -208,6 +242,10 @@ export class ProductoFormComponent implements OnInit {
   cargandoCategorias = signal(false);
   errorCategorias = signal(false);
   stockActual = 0;
+  tieneDatosTributarios = false;
+  readonly afectaciones = AFECTACIONES_IGV;
+  /** El backend rechaza datos tributarios enviados por EMPLEADO. */
+  readonly puedeConfigurarTributos = this.authService.userRole() !== 'EMPLEADO';
   readonly hoy = this.fechaLocal(new Date());
   private readonly validarFechaVencimiento = (control: AbstractControl) =>
     control.value && control.value < this.hoy ? { fechaPasada: true } : null;
@@ -227,7 +265,9 @@ export class ProductoFormComponent implements OnInit {
       Validators.max(1_000_000),
       Validators.pattern(/^[1-9]\d*$/)
     ]],
-    referenciaDocumento: ['', Validators.maxLength(120)]
+    referenciaDocumento: ['', Validators.maxLength(120)],
+    afectacionIgv: this.fb.nonNullable.control<AfectacionIgv | ''>(''),
+    precioIncluyeIgv: [true]
   });
 
   ngOnInit() {
@@ -288,7 +328,10 @@ export class ProductoFormComponent implements OnInit {
   cargarProducto() {
     this.productoService.obtener(+this.id()!).subscribe(producto => {
       this.stockActual = producto.stock;
+      this.tieneDatosTributarios = !!producto.afectacionIgv;
       this.form.patchValue({
+        afectacionIgv: producto.afectacionIgv ?? '',
+        precioIncluyeIgv: producto.precioIncluyeIgv ?? true,
         nombre: producto.nombre,
         descripcion: producto.descripcion,
         precio: producto.precio,
@@ -316,7 +359,8 @@ export class ProductoFormComponent implements OnInit {
       precio: value.precio,
       stock: 0,
       stockMinimo: value.stockMinimo,
-      categoriaId: value.categoriaId
+      categoriaId: value.categoriaId,
+      ...this.datosTributarios(value.afectacionIgv, value.precioIncluyeIgv)
     };
 
     const operacion = this.id()
@@ -354,6 +398,20 @@ export class ProductoFormComponent implements OnInit {
         this.loading.set(false);
       }
     });
+  }
+
+  /**
+   * El backend exige ambos campos juntos o ninguno; con null deja los valores
+   * existentes sin cambios. Exonerado e inafecto no llevan IGV en el precio.
+   */
+  private datosTributarios(afectacion: AfectacionIgv | '', incluyeIgv: boolean) {
+    if (!this.puedeConfigurarTributos || !afectacion) {
+      return { afectacionIgv: null, precioIncluyeIgv: null };
+    }
+    return {
+      afectacionIgv: afectacion,
+      precioIncluyeIgv: afectacion === '10' ? incluyeIgv : false
+    };
   }
 
   irAInventario() {

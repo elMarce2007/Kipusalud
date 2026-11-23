@@ -93,6 +93,19 @@ interface AdminLink {
         <mat-card class="setup-card">
           <mat-card-header>
             <div mat-card-avatar class="step-number">3</div>
+            <mat-card-title>Datos fiscales y SUNAT</mat-card-title>
+            <mat-card-subtitle>RUC, dirección, series y credenciales de emisión.</mat-card-subtitle>
+          </mat-card-header>
+          <mat-card-content>
+            <p>Sin estos datos, el punto de venta solo emite la boleta interna. Con ellos ofrece también
+              boleta electrónica y factura.</p>
+            <a mat-raised-button color="primary" routerLink="/administracion/facturacion">Configurar facturación</a>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card class="setup-card">
+          <mat-card-header>
+            <div mat-card-avatar class="step-number">4</div>
             <mat-card-title>Usuarios y personal</mat-card-title>
             <mat-card-subtitle>Asigna perfiles y delegaciones con alcance limitado.</mat-card-subtitle>
           </mat-card-header>

@@ -1,5 +1,9 @@
 package com.kipusalud.ventasservice.dto;
 
+/**
+ * Perfil fiscal de la farmacia (emisor). No incluye secretos: las credenciales SOL y el
+ * certificado se registran con {@link CredencialesSunatRequest}.
+ */
 public record SunatConfiguracionRequest(
         String ruc,
         String razonSocial,
@@ -9,8 +13,7 @@ public record SunatConfiguracionRequest(
         String provincia,
         String distrito,
         String serieFactura,
-        String usuarioSol,
-        String claveSol,
-        String certificadoPkcs12Base64,
-        String claveCertificado
+        String serieBoleta,
+        String telefono,
+        String email
 ) {}

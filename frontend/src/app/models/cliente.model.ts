@@ -5,4 +5,7 @@ export interface Cliente {
   dni: string;
   telefono: string;
   email: string;
+  ruc?: string | null;
+  razonSocial?: string | null;
+  direccionFiscal?: string | null;
 }

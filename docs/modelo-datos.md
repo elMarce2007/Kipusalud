@@ -21,7 +21,7 @@ No añadas credenciales ni dumps a este documento.
 | `clientes_db` | `clientes`, `informacion_clinica_clientes`, `auditoria_acceso_clinico` |
 | `catalogo_db` | `categorias`, `productos`, `catalogo_importaciones_iniciales`, `domain_outbox`, `processed_domain_events` |
 | `catalogo_db`, schema `kipusalud_inventory` | `ingresos_mercaderia`, `lotes`, `movimientos_inventario`, `salidas_venta` |
-| `ventas_db` | `ventas`, `detalle_ventas`, `ventas_detalles`, `sunat_configuraciones`, `comprobantes_electronicos`, `domain_outbox`, `processed_domain_events` |
+| `ventas_db` | `ventas`, `detalle_ventas`, `ventas_detalles`, `sunat_configuraciones`, `comprobantes_electronicos`, `correlativos_comprobante`, `domain_outbox`, `processed_domain_events` |
 | `personal_db` | `personal` |
 | `auditoria_db` | `domain_event_log` |
 
@@ -66,17 +66,20 @@ existencias detalladas y se actualizan junto con los movimientos.
 
 ### Ventas y facturación
 
-- `Venta`: `id`, fecha, `clienteId`, total, método de pago, importe recibido,
-  vuelto, confirmación manual y actor/fecha de pago, `farmaciaId`, clave y
-  huella idempotentes, estado, líneas.
+- `Venta`: `id`, fecha, `clienteId` (opcional en boletas), total, método de pago,
+  importe recibido, vuelto, confirmación manual y actor/fecha de pago, `farmaciaId`,
+  clave y huella idempotentes, estado, líneas, `tipoComprobante`
+  (`BOLETA_INTERNA`/`BOLETA_ELECTRONICA`/`FACTURA`) y serie/número del comprobante.
+- `CorrelativoComprobante`: siguiente número por farmacia y serie de la boleta interna (`I001`).
 - `DetalleVenta`: `id`, `productoId`, cantidad, precio unitario, subtotal,
   snapshot de nombre del producto y datos tributarios (`afectacionIgv`,
   `precioIncluyeIgv`).
 - `ComprobanteElectronico`: `id`, farmacia/venta, serie/número, estado, nombre
   archivo, XML firmado, CDR ZIP, respuesta SUNAT y marcas de tiempo.
-- `SunatConfiguracion`: farmacia, RUC/razón social/dirección, UBIGEO,
-  departamento/provincia/distrito, serie/correlativo y blobs cifrados de SOL y
-  certificado.
+- `SunatConfiguracion`: perfil fiscal de la farmacia (RUC/razón social/dirección,
+  UBIGEO, departamento/provincia/distrito, teléfono, correo), series y correlativos
+  de factura (`F###`) y boleta electrónica (`B###`), y blobs cifrados de SOL y
+  certificado (opcionales hasta registrarlos).
 
 ### Personal y auditoría
 
@@ -109,7 +112,7 @@ existencias detalladas y se actualizan junto con los movimientos.
 | Auth | V1–V6 |
 | Clientes | V1, V2, V5 |
 | Catálogo | V1–V7 |
-| Ventas | V1–V8 |
+| Ventas | V1–V9 |
 | Personal | V1–V2 |
 | Auditoría | V1 |
 

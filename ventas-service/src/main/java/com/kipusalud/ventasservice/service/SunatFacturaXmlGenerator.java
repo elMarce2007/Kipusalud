@@ -54,45 +54,62 @@ public class SunatFacturaXmlGenerator {
             ClienteClient.ClienteDto cliente
     ) {
         try {
-            List<LineAmounts> lines = calculateLines(venta);
-            Document document = newDocument();
-            Element root = document.createElementNS(INVOICE, "Invoice");
-            document.appendChild(root);
-            root.setAttribute("xmlns", INVOICE);
-            root.setAttribute("xmlns:cac", CAC);
-            root.setAttribute("xmlns:cbc", CBC);
-            root.setAttribute("xmlns:ext", EXT);
-
-            Element extensions = append(document, root, EXT, "ext:UBLExtensions");
-            Element extension = append(document, extensions, EXT, "ext:UBLExtension");
-            Element extensionContent = append(document, extension, EXT, "ext:ExtensionContent");
-            appendText(document, root, CBC, "cbc:UBLVersionID", "2.1");
-            appendText(document, root, CBC, "cbc:CustomizationID", "2.0");
-            appendText(document, root, CBC, "cbc:ID", comprobante.getSerie() + "-" + comprobante.getNumero());
-            appendText(document, root, CBC, "cbc:IssueDate", venta.getFecha().toLocalDate().format(DATE));
-            appendText(document, root, CBC, "cbc:IssueTime", venta.getFecha().toLocalTime().format(TIME));
-            Element invoiceType = appendText(document, root, CBC, "cbc:InvoiceTypeCode", "01");
-            invoiceType.setAttribute("listAgencyName", "PE:SUNAT");
-            invoiceType.setAttribute("listName", "Tipo de Documento");
-            invoiceType.setAttribute("listURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01");
-            invoiceType.setAttribute("listID", "0101");
-            invoiceType.setAttribute("name", "Tipo de Operacion");
-            appendText(document, root, CBC, "cbc:DocumentCurrencyCode", "PEN");
-            appendSignatureParty(document, root, config);
-            appendSupplier(document, root, config);
-            appendCustomer(document, root, cliente);
-            appendTaxTotal(document, root, lines);
-            appendMonetaryTotal(document, root, lines);
-            for (LineAmounts line : lines) {
-                appendInvoiceLine(document, root, line);
-            }
+            Document document = buildDocument(venta, config, comprobante, cliente);
+            Element extensionContent = (Element) document.getElementsByTagNameNS(EXT, "ExtensionContent").item(0);
             sign(document, extensionContent, credentials);
             return serialize(document);
         } catch (ResponseStatusException e) {
             throw e;
         } catch (Exception e) {
-            throw new IllegalStateException("No se pudo generar o firmar el XML UBL de la factura", e);
+            throw new IllegalStateException("No se pudo generar o firmar el XML UBL del comprobante", e);
         }
+    }
+
+    /** XML UBL sin firmar; separado de la firma para poder verificarlo en pruebas. */
+    Document buildDocument(
+            Venta venta,
+            SunatConfiguracion config,
+            ComprobanteElectronico comprobante,
+            ClienteClient.ClienteDto cliente
+    ) throws Exception {
+        List<LineAmounts> lines = calculateLines(venta);
+        Document document = newDocument();
+        Element root = document.createElementNS(INVOICE, "Invoice");
+        document.appendChild(root);
+        root.setAttribute("xmlns", INVOICE);
+        root.setAttribute("xmlns:cac", CAC);
+        root.setAttribute("xmlns:cbc", CBC);
+        root.setAttribute("xmlns:ext", EXT);
+
+        Element extensions = append(document, root, EXT, "ext:UBLExtensions");
+        Element extension = append(document, extensions, EXT, "ext:UBLExtension");
+        append(document, extension, EXT, "ext:ExtensionContent");
+        appendText(document, root, CBC, "cbc:UBLVersionID", "2.1");
+        appendText(document, root, CBC, "cbc:CustomizationID", "2.0");
+        appendText(document, root, CBC, "cbc:ID", comprobante.getSerie() + "-" + comprobante.getNumero());
+        appendText(document, root, CBC, "cbc:IssueDate", venta.getFecha().toLocalDate().format(DATE));
+        appendText(document, root, CBC, "cbc:IssueTime", venta.getFecha().toLocalTime().format(TIME));
+        String tipo = "03".equals(comprobante.getTipoComprobante()) ? "03" : "01";
+        Element invoiceType = appendText(document, root, CBC, "cbc:InvoiceTypeCode", tipo);
+        invoiceType.setAttribute("listAgencyName", "PE:SUNAT");
+        invoiceType.setAttribute("listName", "Tipo de Documento");
+        invoiceType.setAttribute("listURI", "urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01");
+        invoiceType.setAttribute("listID", "0101");
+        invoiceType.setAttribute("name", "Tipo de Operacion");
+        appendText(document, root, CBC, "cbc:DocumentCurrencyCode", "PEN");
+        appendSignatureParty(document, root, config);
+        appendSupplier(document, root, config);
+        if ("03".equals(tipo)) {
+            appendBoletaCustomer(document, root, cliente, venta);
+        } else {
+            appendCustomer(document, root, cliente);
+        }
+        appendTaxTotal(document, root, lines);
+        appendMonetaryTotal(document, root, lines);
+        for (LineAmounts line : lines) {
+            appendInvoiceLine(document, root, line);
+        }
+        return document;
     }
 
     List<LineAmounts> calculateLines(Venta venta) {
@@ -176,6 +193,31 @@ public class SunatFacturaXmlGenerator {
         appendText(d, postal, CAC, "cac:AddressLine", cliente.direccionFiscal());
         Element country = append(d, postal, CAC, "cac:Country");
         appendText(d, country, CBC, "cbc:IdentificationCode", "PE");
+    }
+
+    /**
+     * Adquiriente de una boleta (catálogo 06 de SUNAT): DNI ("1") si el cliente lo tiene; si
+     * no, "-" (varios), permitido solo para ventas menores a S/ 700.
+     */
+    private void appendBoletaCustomer(Document d, Element root, ClienteClient.ClienteDto cliente, Venta venta) {
+        boolean conDni = cliente != null && cliente.dni() != null && cliente.dni().trim().matches("\\d{8}");
+        if (!conDni && venta.getTotal().compareTo(SunatConfiguracionService.MONTO_MINIMO_BOLETA_CON_DOCUMENTO) >= 0) {
+            throw badRequest("Una boleta desde S/ 700 requiere el DNI del cliente");
+        }
+        Element customer = append(d, root, CAC, "cac:AccountingCustomerParty");
+        Element party = append(d, customer, CAC, "cac:Party");
+        Element id = append(d, append(d, party, CAC, "cac:PartyIdentification"), CBC, "cbc:ID");
+        id.setAttribute("schemeID", conDni ? "1" : "-");
+        id.setTextContent(conDni ? cliente.dni().trim() : "-");
+        Element legal = append(d, party, CAC, "cac:PartyLegalEntity");
+        String nombre = conDni
+                ? (nullToEmpty(cliente.nombres()) + " " + nullToEmpty(cliente.apellidos())).trim()
+                : "CLIENTES VARIOS";
+        appendText(d, legal, CBC, "cbc:RegistrationName", nombre.isBlank() ? "CLIENTES VARIOS" : nombre);
+    }
+
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private void appendAddress(

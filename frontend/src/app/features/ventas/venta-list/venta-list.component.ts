@@ -12,7 +12,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 
 import { VentaService } from '../../../services/venta.service';
-import { Venta } from '../../../models/venta.model';
+import { TIPOS_COMPROBANTE, Venta } from '../../../models/venta.model';
 
 @Component({
   selector: 'app-venta-list',
@@ -73,9 +73,19 @@ import { Venta } from '../../../models/venta.model';
               <td mat-cell *matCellDef="let row">{{ row.fecha | date:'dd/MM/yyyy HH:mm' }}</td>
             </ng-container>
 
+            <ng-container matColumnDef="comprobante">
+              <th mat-header-cell *matHeaderCellDef>Comprobante</th>
+              <td mat-cell *matCellDef="let row">
+                <span class="tipo">{{ tipoLabel(row) }}</span>
+                @if (row.serieComprobante && row.numeroComprobante) {
+                  <br><small>{{ row.serieComprobante }}-{{ row.numeroComprobante }}</small>
+                }
+              </td>
+            </ng-container>
+
             <ng-container matColumnDef="clienteId">
               <th mat-header-cell *matHeaderCellDef mat-sort-header>Cliente ID</th>
-              <td mat-cell *matCellDef="let row">{{ row.clienteId }}</td>
+              <td mat-cell *matCellDef="let row">{{ row.clienteId ?? 'Público general' }}</td>
             </ng-container>
 
             <ng-container matColumnDef="total">
@@ -118,7 +128,7 @@ import { Venta } from '../../../models/venta.model';
             <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
 
             <tr class="mat-row" *matNoDataRow>
-              <td class="mat-cell" colspan="8" style="text-align: center; padding: 20px;">
+              <td class="mat-cell" colspan="9" style="text-align: center; padding: 20px;">
                 No se encontraron resultados
               </td>
             </tr>
@@ -130,6 +140,7 @@ import { Venta } from '../../../models/venta.model';
     </div>
   `,
   styles: `
+    .tipo { font-weight: 500; }
     .payment-disclaimer { margin: -12px 0 20px; color: var(--kipu-muted); font-size: 12px; }
   `
 })
@@ -140,10 +151,14 @@ export class VentaListComponent implements OnInit, AfterViewInit {
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
 
-  displayedColumns = ['id', 'fecha', 'clienteId', 'total', 'metodoPago', 'estado', 'items', 'acciones'];
+  displayedColumns = ['id', 'fecha', 'comprobante', 'clienteId', 'total', 'metodoPago', 'estado', 'items', 'acciones'];
   dataSource = new MatTableDataSource<Venta>();
   loadError = signal<string | null>(null);
   retryingId = signal<number | null>(null);
+
+  tipoLabel(venta: Venta): string {
+    return TIPOS_COMPROBANTE[venta.tipoComprobante ?? 'BOLETA_INTERNA'];
+  }
 
   ngOnInit() {
     this.cargarDatos();

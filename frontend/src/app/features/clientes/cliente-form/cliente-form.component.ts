@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -9,6 +9,14 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { ClienteService } from '../../../services/cliente.service';
+
+/** RUC, razón social y dirección fiscal van juntos: o los tres, o ninguno. */
+export const datosFiscalesCompletos = (group: AbstractControl): ValidationErrors | null => {
+  const valores = ['ruc', 'razonSocial', 'direccionFiscal']
+    .map(campo => String(group.get(campo)?.value ?? '').trim());
+  const llenos = valores.filter(v => v.length > 0).length;
+  return llenos === 0 || llenos === valores.length ? null : { datosFiscalesIncompletos: true };
+};
 
 @Component({
   selector: 'app-cliente-form',
@@ -78,6 +86,38 @@ import { ClienteService } from '../../../services/cliente.service';
               </mat-form-field>
             </div>
 
+            <section class="datos-fiscales">
+              <h2>Datos para factura electrónica</h2>
+              <p class="form-help">
+                Opcional. Complétalos solo si el cliente necesita factura: SUNAT exige RUC,
+                razón social y dirección fiscal del receptor.
+              </p>
+              <div class="form-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>RUC</mat-label>
+                  <input matInput formControlName="ruc" maxlength="11" inputmode="numeric">
+                  @if (form.get('ruc')?.hasError('pattern') && form.get('ruc')?.touched) {
+                    <mat-error>El RUC debe tener 11 dígitos</mat-error>
+                  }
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Razón social</mat-label>
+                  <input matInput formControlName="razonSocial" maxlength="200">
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Dirección fiscal</mat-label>
+                  <input matInput formControlName="direccionFiscal" maxlength="250">
+                </mat-form-field>
+              </div>
+              @if (form.hasError('datosFiscalesIncompletos') && (form.dirty || form.touched)) {
+                <p class="form-error" role="alert">
+                  Para facturar completa RUC, razón social y dirección fiscal, o deja los tres vacíos.
+                </p>
+              }
+            </section>
+
             <div class="form-actions">
               <button mat-button type="button" (click)="cancelar()">Cancelar</button>
               <button mat-raised-button color="primary" type="submit"
@@ -90,7 +130,12 @@ import { ClienteService } from '../../../services/cliente.service';
       </mat-card>
     </div>
   `,
-  styles: ``
+  styles: `
+    .datos-fiscales { margin-top: 16px; padding-top: 16px; border-top: 1px solid #e4dfd8; }
+    .datos-fiscales h2 { font-size: 1.1rem; margin: 0 0 4px; }
+    .form-help { color: #62594e; line-height: 1.5; }
+    .form-error { color: #b3261e; margin: 0 0 12px; }
+  `
 })
 export class ClienteFormComponent implements OnInit {
   private fb = inject(FormBuilder);
@@ -106,8 +151,11 @@ export class ClienteFormComponent implements OnInit {
     apellidos: ['', Validators.required],
     dni: ['', [Validators.required, Validators.pattern(/^\d{8}$/)]],
     telefono: ['', Validators.required],
-    email: ['', [Validators.required, Validators.email]]
-  });
+    email: ['', [Validators.required, Validators.email]],
+    ruc: ['', Validators.pattern(/^\d{11}$/)],
+    razonSocial: ['', Validators.maxLength(200)],
+    direccionFiscal: ['', Validators.maxLength(250)]
+  }, { validators: datosFiscalesCompletos });
 
   ngOnInit() {
     if (this.id()) {
@@ -117,7 +165,12 @@ export class ClienteFormComponent implements OnInit {
 
   cargarCliente() {
     this.clienteService.obtener(+this.id()!).subscribe(cliente => {
-      this.form.patchValue(cliente);
+      this.form.patchValue({
+        ...cliente,
+        ruc: cliente.ruc ?? '',
+        razonSocial: cliente.razonSocial ?? '',
+        direccionFiscal: cliente.direccionFiscal ?? ''
+      });
     });
   }
 
@@ -125,7 +178,13 @@ export class ClienteFormComponent implements OnInit {
     if (this.form.invalid) return;
 
     this.loading.set(true);
-    const cliente = this.form.getRawValue();
+    const value = this.form.getRawValue();
+    const cliente = {
+      ...value,
+      ruc: value.ruc.trim() || null,
+      razonSocial: value.razonSocial.trim() || null,
+      direccionFiscal: value.direccionFiscal.trim() || null
+    };
 
     const operacion = this.id()
       ? this.clienteService.actualizar(+this.id()!, cliente)

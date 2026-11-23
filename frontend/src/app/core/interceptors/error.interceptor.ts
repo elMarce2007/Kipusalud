@@ -1,9 +1,22 @@
-import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
+import { HttpContextToken, HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '../../services/auth.service';
+
+/**
+ * Marca peticiones donde un 404 es una respuesta esperada (por ejemplo, una venta
+ * que aún no tiene factura). El componente lo maneja y no se muestra el aviso global.
+ */
+export const SILENCIAR_404 = new HttpContextToken<boolean>(() => false);
+
+/**
+ * Mensajes propios por código HTTP para una petición concreta. Los servicios no
+ * exponen el motivo de sus errores (solo "Precondition Failed", etc.), así que
+ * cada operación puede explicar qué significa cada código en su contexto.
+ */
+export const MENSAJES_POR_ESTADO = new HttpContextToken<Partial<Record<number, string>>>(() => ({}));
 
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
@@ -12,9 +25,17 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
+      if (error.status === 404 && req.context.get(SILENCIAR_404)) {
+        return throwError(() => error);
+      }
+
       let errorMessage = `No se pudo completar la solicitud (HTTP ${error.status || 'sin conexión'}).`;
 
-      if (error.status === 401) {
+      const mensajePropio = req.context.get(MENSAJES_POR_ESTADO)[error.status];
+
+      if (mensajePropio) {
+        errorMessage = mensajePropio;
+      } else if (error.status === 401) {
         if (authService.isAuthenticated()) {
           errorMessage = 'Sesión expirada. Inicia sesión nuevamente.';
           authService.logout();

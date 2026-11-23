@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -9,6 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatRadioModule } from '@angular/material/radio';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { CurrencyPipe } from '@angular/common';
 
@@ -17,8 +18,16 @@ import { ProductoService } from '../../../services/producto.service';
 import { VentaService } from '../../../services/venta.service';
 import { Cliente } from '../../../models/cliente.model';
 import { Producto } from '../../../models/producto.model';
-import { DetalleVenta, MetodoPago } from '../../../models/venta.model';
+import { DetalleVenta, MetodoPago, TIPOS_COMPROBANTE, TipoComprobante } from '../../../models/venta.model';
+import { OpcionesComprobante } from '../../../models/facturacion.model';
+import { FacturacionService } from '../../../services/facturacion.service';
 import { createIdempotencyKey } from '../../../core/utils/idempotency-key';
+
+/** Un cliente puede recibir factura si tiene RUC, razón social y dirección fiscal. */
+export function clienteFacturable(cliente: Cliente | null | undefined): boolean {
+  return !!cliente && /^\d{11}$/.test(cliente.ruc?.trim() ?? '')
+    && !!cliente.razonSocial?.trim() && !!cliente.direccionFiscal?.trim();
+}
 
 @Component({
   selector: 'app-venta-nueva',
@@ -33,7 +42,9 @@ import { createIdempotencyKey } from '../../../core/utils/idempotency-key';
     MatButtonModule,
     MatIconModule,
     MatTableModule,
-    MatCheckboxModule
+    MatCheckboxModule,
+    MatRadioModule,
+    RouterLink
   ],
   template: `
     <div class="venta-container">
@@ -53,19 +64,64 @@ import { createIdempotencyKey } from '../../../core/utils/idempotency-key';
       <div class="venta-grid">
         <mat-card class="cliente-card">
           <mat-card-header>
-            <mat-card-title>Cliente</mat-card-title>
+            <mat-card-title>Comprobante de pago</mat-card-title>
           </mat-card-header>
           <mat-card-content>
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Seleccionar Cliente</mat-label>
-              <mat-select [value]="clienteSeleccionado()" (selectionChange)="seleccionarCliente($event.value)">
-                @for (cliente of clientes(); track cliente.id) {
-                  <mat-option [value]="cliente">
-                    {{ cliente.nombres }} {{ cliente.apellidos }} - {{ cliente.dni }}
-                  </mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
+            <mat-radio-group class="tipos-comprobante" aria-label="Tipo de comprobante"
+                             [value]="tipoComprobante()" (change)="cambiarTipoComprobante($event.value)">
+              <mat-radio-button value="BOLETA_INTERNA">
+                <span class="tipo-titulo">Boleta</span>
+                <span class="tipo-ayuda">Comprobante simple de la farmacia. No se envía a SUNAT.</span>
+              </mat-radio-button>
+              <mat-radio-button value="BOLETA_ELECTRONICA" [disabled]="!opciones()?.boletaElectronicaDisponible">
+                <span class="tipo-titulo">Boleta electrónica</span>
+                <span class="tipo-ayuda">Se envía a SUNAT. Desde S/ {{ montoMinimoConDocumento() }} requiere el DNI del cliente.</span>
+              </mat-radio-button>
+              <mat-radio-button value="FACTURA" [disabled]="!opciones()?.facturaDisponible">
+                <span class="tipo-titulo">Factura</span>
+                <span class="tipo-ayuda">A nombre de una empresa con RUC. Se envía a SUNAT.</span>
+              </mat-radio-button>
+            </mat-radio-group>
+            @if (opciones() && !opciones()!.facturaDisponible && opciones()!.motivoNoDisponible) {
+              <p class="nota" role="note">{{ opciones()!.motivoNoDisponible }}</p>
+            }
+
+            @if (tipoComprobante() === 'FACTURA') {
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Buscar empresa por razón social o RUC</mat-label>
+                <input matInput [value]="busquedaEmpresa()" (input)="buscarEmpresa($event)" autocomplete="off">
+                <mat-icon matSuffix>search</mat-icon>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Empresa</mat-label>
+                <mat-select [value]="clienteSeleccionado()" (selectionChange)="seleccionarCliente($event.value)">
+                  @for (empresa of empresasFiltradas(); track empresa.id) {
+                    <mat-option [value]="empresa">{{ empresa.razonSocial }} · RUC {{ empresa.ruc }}</mat-option>
+                  } @empty {
+                    <mat-option disabled>No hay empresas que coincidan</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <a mat-button routerLink="/clientes/nuevo">
+                <mat-icon>add_business</mat-icon> Registrar empresa como cliente
+              </a>
+            } @else {
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Cliente</mat-label>
+                <mat-select [value]="clienteSeleccionado()" (selectionChange)="seleccionarCliente($event.value)">
+                  <mat-option [value]="null">Público general (sin identificar)</mat-option>
+                  @for (cliente of clientes(); track cliente.id) {
+                    <mat-option [value]="cliente">
+                      {{ cliente.nombres }} {{ cliente.apellidos }} - {{ cliente.dni }}
+                    </mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            }
+
+            @if (requisitoPendiente()) {
+              <p class="requisito" role="alert">{{ requisitoPendiente() }}</p>
+            }
           </mat-card-content>
         </mat-card>
 
@@ -191,19 +247,27 @@ import { createIdempotencyKey } from '../../../core/utils/idempotency-key';
           <button mat-raised-button color="primary"
                   (click)="confirmarVenta()"
                   [disabled]="!puedeConfirmar()">
-            <mat-icon>check</mat-icon> Registrar venta
+            <mat-icon>check</mat-icon> Registrar venta con {{ etiquetaComprobante() }}
           </button>
         </mat-card-actions>
       </mat-card>
     </div>
   `,
-  styles: ``
+  styles: `
+    .tipos-comprobante { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .tipos-comprobante mat-radio-button { align-items: flex-start; }
+    .tipo-titulo { display: block; font-weight: 600; }
+    .tipo-ayuda { display: block; font-size: 12px; color: #62594e; }
+    .nota { font-size: 13px; color: #62594e; margin: 0 0 12px; }
+    .requisito { color: #8a4b00; background: #fff4e0; padding: 8px 12px; border-radius: 6px; margin: 0; }
+  `
 })
 export class VentaNuevaComponent implements OnInit {
   private fb = inject(FormBuilder);
   private clienteService = inject(ClienteService);
   private productoService = inject(ProductoService);
   private ventaService = inject(VentaService);
+  private facturacionService = inject(FacturacionService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private snackBar = inject(MatSnackBar);
@@ -218,6 +282,37 @@ export class VentaNuevaComponent implements OnInit {
   metodoPago = signal<MetodoPago>('EFECTIVO');
   montoRecibido = signal(0);
   pagoExternoVerificado = signal(false);
+  tipoComprobante = signal<TipoComprobante>('BOLETA_INTERNA');
+  opciones = signal<OpcionesComprobante | null>(null);
+  busquedaEmpresa = signal('');
+
+  montoMinimoConDocumento = computed(() => this.opciones()?.montoMinimoBoletaConDocumento ?? 700);
+  etiquetaComprobante = computed(() => TIPOS_COMPROBANTE[this.tipoComprobante()].toLowerCase());
+
+  /** Clientes con datos completos para recibir factura. */
+  empresas = computed(() => this.clientes().filter(clienteFacturable));
+  empresasFiltradas = computed(() => {
+    const texto = this.busquedaEmpresa().trim().toLowerCase();
+    return this.empresas().filter(e => !texto
+      || (e.razonSocial ?? '').toLowerCase().includes(texto)
+      || (e.ruc ?? '').includes(texto));
+  });
+
+  /** Qué le falta a la venta para el comprobante elegido; null si nada. */
+  requisitoPendiente = computed((): string | null => {
+    const cliente = this.clienteSeleccionado();
+    switch (this.tipoComprobante()) {
+      case 'FACTURA':
+        return cliente && clienteFacturable(cliente)
+          ? null : 'Selecciona la empresa que recibirá la factura.';
+      case 'BOLETA_ELECTRONICA':
+        return this.total() >= this.montoMinimoConDocumento() && !/^\d{8}$/.test(cliente?.dni ?? '')
+          ? `Desde S/ ${this.montoMinimoConDocumento()} la boleta electrónica requiere un cliente con DNI.`
+          : null;
+      default:
+        return null;
+    }
+  });
 
   displayedColumns = ['producto', 'cantidad', 'precioUnitario', 'subtotal', 'acciones'];
 
@@ -225,7 +320,7 @@ export class VentaNuevaComponent implements OnInit {
     this.detalles().reduce((sum, d) => sum + d.subtotal, 0)
   );
   vuelto = computed(() => Math.max(0, this.montoRecibido() - this.total()));
-  puedeConfirmar = computed(() => !!this.clienteSeleccionado()
+  puedeConfirmar = computed(() => !this.requisitoPendiente()
     && this.detalles().length > 0
     && !this.loading()
     && (this.metodoPago() === 'EFECTIVO'
@@ -239,6 +334,11 @@ export class VentaNuevaComponent implements OnInit {
 
   ngOnInit() {
     this.loadError.set(null);
+    this.facturacionService.obtenerOpciones().subscribe({
+      next: opciones => this.opciones.set(opciones),
+      // Sin opciones solo queda la boleta interna, que siempre está disponible.
+      error: err => console.error('No se pudieron consultar los comprobantes disponibles.', err)
+    });
     this.clienteService.listar().subscribe({
       next: data => {
         this.clientes.set(data);
@@ -286,6 +386,18 @@ export class VentaNuevaComponent implements OnInit {
     this.productoForm.reset({ cantidad: 1 });
   }
 
+  cambiarTipoComprobante(tipo: TipoComprobante): void {
+    this.tipoComprobante.set(tipo);
+    if (tipo === 'FACTURA' && !clienteFacturable(this.clienteSeleccionado())) {
+      this.clienteSeleccionado.set(null);
+    }
+    this.pendingVentaKey = null;
+  }
+
+  buscarEmpresa(event: Event): void {
+    this.busquedaEmpresa.set((event.target as HTMLInputElement).value);
+  }
+
   seleccionarCliente(cliente: Cliente | null): void {
     this.clienteSeleccionado.set(cliente);
     this.pendingVentaKey = null;
@@ -316,14 +428,15 @@ export class VentaNuevaComponent implements OnInit {
 
   confirmarVenta() {
     const cliente = this.clienteSeleccionado();
-    if (!this.puedeConfirmar() || !cliente?.id) return;
+    if (!this.puedeConfirmar()) return;
 
     this.loading.set(true);
     this.pendingVentaKey ??= createIdempotencyKey();
     const metodoPago = this.metodoPago();
     const venta = {
       claveIdempotencia: this.pendingVentaKey,
-      clienteId: cliente.id,
+      clienteId: cliente?.id ?? null,
+      tipoComprobante: this.tipoComprobante(),
       metodoPago,
       montoRecibido: metodoPago === 'EFECTIVO' ? this.montoRecibido() : this.total(),
       confirmacionManualPago: metodoPago !== 'EFECTIVO' && this.pagoExternoVerificado(),
@@ -339,7 +452,9 @@ export class VentaNuevaComponent implements OnInit {
       next: ventaRegistrada => {
         this.pendingVentaKey = null;
         const confirmado = ventaRegistrada.estado === 'CONFIRMADA';
-        this.router.navigate(['/ventas']).then(navegado => {
+        // Se abre el detalle para imprimir el comprobante o revisar su estado en SUNAT.
+        const destino = confirmado && ventaRegistrada.id ? ['/ventas', ventaRegistrada.id] : ['/ventas'];
+        this.router.navigate(destino).then(navegado => {
           if (!navegado) {
             console.error('La venta se registró, pero no se pudo abrir Ventas y despacho.');
             this.snackBar.open('Venta registrada, pero no se pudo abrir Ventas y despacho.', 'Cerrar',
@@ -348,20 +463,17 @@ export class VentaNuevaComponent implements OnInit {
           }
           this.snackBar.open(
             confirmado
-              ? 'Venta registrada exitosamente en el Kardex.'
+              ? 'Venta registrada. Ya puedes imprimir el comprobante.'
               : 'Venta registrada, pero sigue pendiente de confirmación en inventario.',
             'Cerrar',
             { duration: 5000 }
           );
         });
       },
-      error: (err: { status?: number }) => {
+      error: err => {
+        // El interceptor muestra el motivo según el código HTTP (ver VentaService.crear).
         console.error('No se pudo registrar la venta.', err);
         this.loading.set(false);
-        this.snackBar.open(err.status === 409
-          ? 'Stock insuficiente. Actualiza la lista de productos e inténtalo de nuevo.'
-          : 'No se pudo registrar la venta. Revisa los datos e inténtalo de nuevo.',
-        'Cerrar', { duration: 5000 });
       }
     });
   }

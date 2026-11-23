@@ -5,12 +5,25 @@ export interface DetalleVenta {
   precioUnitario: number;
   subtotal: number;
   productoNombre?: string;
+  /** Copia tomada al vender (backend: nombreProducto); sirve para imprimir el comprobante. */
+  nombreProducto?: string | null;
+  afectacionIgv?: string | null;
+  precioIncluyeIgv?: boolean | null;
 }
+
+/** Comprobante elegido al registrar la venta. */
+export type TipoComprobante = 'BOLETA_INTERNA' | 'BOLETA_ELECTRONICA' | 'FACTURA';
+
+export const TIPOS_COMPROBANTE: Record<TipoComprobante, string> = {
+  BOLETA_INTERNA: 'Boleta',
+  BOLETA_ELECTRONICA: 'Boleta electrónica',
+  FACTURA: 'Factura'
+};
 
 export interface Venta {
   id?: number;
   fecha: Date | string;
-  clienteId: number;
+  clienteId: number | null;
   total: number;
   detalles: DetalleVenta[];
   clienteNombre?: string;
@@ -21,13 +34,18 @@ export interface Venta {
   pagoConfirmadoPor?: string;
   pagoConfirmadoEn?: Date | string;
   estado?: string;
+  tipoComprobante?: TipoComprobante;
+  serieComprobante?: string | null;
+  numeroComprobante?: string | null;
 }
 
 export type MetodoPago = 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
 
 export interface VentaCreate {
   claveIdempotencia: string;
-  clienteId: number;
+  /** Opcional en boletas ("Público general"); obligatorio en facturas. */
+  clienteId: number | null;
+  tipoComprobante: TipoComprobante;
   metodoPago: MetodoPago;
   montoRecibido: number;
   confirmacionManualPago: boolean;
