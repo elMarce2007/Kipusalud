@@ -26,8 +26,15 @@ producción.
 
 ## Configuración por farmacia
 
-El administrador lo configura en la interfaz en **Administración → Datos fiscales y
-SUNAT**, en dos pasos independientes (la API también admite `QF_REGENTE`):
+En la interfaz se configura en dos lugares (la API admite `ADMINISTRADOR` y `QF_REGENTE`):
+
+- **Farmacia → Datos de la empresa**: razón social, RUC, dirección fiscal, ubigeo,
+  departamento/provincia/distrito, teléfono y correo. Los demás perfiles los ven
+  en modo lectura.
+- **Administración → Facturación electrónica SUNAT** (solo administrador): series de
+  boletas y facturas, y credenciales SOL con el certificado.
+
+Ambos usan la misma API:
 
 1. `PUT /api/ventas/facturacion/configuracion` — perfil fiscal: `ruc`, `razonSocial`,
    `direccionFiscal`, `ubigeo`, `departamento`, `provincia`, `distrito`,

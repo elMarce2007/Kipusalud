@@ -82,7 +82,7 @@ interface AdminLink {
           <mat-card-header>
             <div mat-card-avatar class="step-number">2</div>
             <mat-card-title>Datos de la Botica</mat-card-title>
-            <mat-card-subtitle>Consulta y actualiza la información autorizada.</mat-card-subtitle>
+            <mat-card-subtitle>Nombre, razón social, RUC, dirección y contacto.</mat-card-subtitle>
           </mat-card-header>
           <mat-card-content>
             <p>El Administrador define si el Gerente/Supervisor puede modificar el nombre de la farmacia.</p>
@@ -93,12 +93,12 @@ interface AdminLink {
         <mat-card class="setup-card">
           <mat-card-header>
             <div mat-card-avatar class="step-number">3</div>
-            <mat-card-title>Datos fiscales y SUNAT</mat-card-title>
-            <mat-card-subtitle>RUC, dirección, series y credenciales de emisión.</mat-card-subtitle>
+            <mat-card-title>Facturación electrónica SUNAT</mat-card-title>
+            <mat-card-subtitle>Series de comprobantes y credenciales de emisión.</mat-card-subtitle>
           </mat-card-header>
           <mat-card-content>
-            <p>Sin estos datos, el punto de venta solo emite la boleta interna. Con ellos ofrece también
-              boleta electrónica y factura.</p>
+            <p>Con los datos de la empresa (en Farmacia) y estas credenciales, el punto de venta ofrece
+              también boleta electrónica y factura. Sin ellos solo emite la boleta interna.</p>
             <a mat-raised-button color="primary" routerLink="/administracion/facturacion">Configurar facturación</a>
           </mat-card-content>
         </mat-card>

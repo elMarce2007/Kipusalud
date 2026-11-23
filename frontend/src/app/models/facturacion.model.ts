@@ -14,6 +14,10 @@ export interface SunatConfiguracion {
   credencialesConfiguradas: boolean;
 }
 
+/** Series usadas al registrar los datos de la empresa por primera vez; se cambian en Administración. */
+export const SERIE_FACTURA_INICIAL = 'F001';
+export const SERIE_BOLETA_INICIAL = 'B001';
+
 export interface PerfilFiscalRequest {
   ruc: string;
   razonSocial: string;

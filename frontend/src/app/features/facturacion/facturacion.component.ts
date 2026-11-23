@@ -10,14 +10,18 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
-import { SunatConfiguracion } from '../../models/facturacion.model';
+import {
+  SERIE_BOLETA_INICIAL,
+  SERIE_FACTURA_INICIAL,
+  SunatConfiguracion
+} from '../../models/facturacion.model';
 import { FacturacionService } from '../../services/facturacion.service';
 
 const MAX_CERTIFICADO_BYTES = 1_000_000;
 
 /**
- * Administración → datos fiscales de la farmacia y credenciales SUNAT. Son dos formularios
- * independientes: los datos del emisor se corrigen sin volver a ingresar los secretos.
+ * Administración → series de comprobantes y credenciales SUNAT. Los datos de la empresa
+ * (razón social, RUC, dirección, contacto) se editan en el módulo Farmacia.
  */
 @Component({
   selector: 'app-facturacion',
@@ -37,7 +41,7 @@ const MAX_CERTIFICADO_BYTES = 1_000_000;
       <div class="page-header">
         <div>
           <p class="eyebrow">Administración</p>
-          <h1>Datos fiscales y SUNAT</h1>
+          <h1>Facturación electrónica SUNAT</h1>
         </div>
         <a mat-button routerLink="/administracion"><mat-icon>arrow_back</mat-icon> Volver</a>
       </div>
@@ -53,7 +57,7 @@ const MAX_CERTIFICADO_BYTES = 1_000_000;
               <p>El punto de venta ya ofrece los tres comprobantes.</p>
             } @else {
               <strong>Por ahora solo se emite la boleta interna</strong>
-              <p>Para ofrecer boleta electrónica y factura, completa los datos fiscales y las credenciales SUNAT.</p>
+              <p>Para ofrecer boleta electrónica y factura, registra los datos de la empresa en Farmacia y aquí las credenciales SUNAT.</p>
             }
           </div>
         </div>
@@ -67,89 +71,59 @@ const MAX_CERTIFICADO_BYTES = 1_000_000;
         <mat-card class="config-card">
           <mat-card-header>
             <div mat-card-avatar class="paso" [class.hecho]="!!perfil()">1</div>
-            <mat-card-title>Datos fiscales de la farmacia</mat-card-title>
-            <mat-card-subtitle>Aparecen como emisor en boletas y facturas.</mat-card-subtitle>
+            <mat-card-title>Series de comprobantes</mat-card-title>
+            <mat-card-subtitle>Series autorizadas por SUNAT para boletas y facturas electrónicas.</mat-card-subtitle>
           </mat-card-header>
           <mat-card-content>
-            <form [formGroup]="perfilForm" (ngSubmit)="guardarPerfil()">
-              <div class="form-grid">
-                <mat-form-field appearance="outline">
-                  <mat-label>RUC</mat-label>
-                  <input matInput formControlName="ruc" maxlength="11" inputmode="numeric">
-                  @if (perfilForm.controls.ruc.invalid && perfilForm.controls.ruc.touched) {
-                    <mat-error>El RUC debe tener 11 dígitos</mat-error>
-                  }
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>Razón social</mat-label>
-                  <input matInput formControlName="razonSocial" maxlength="150">
-                </mat-form-field>
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Dirección fiscal</mat-label>
-                  <input matInput formControlName="direccionFiscal" maxlength="255">
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>Ubigeo</mat-label>
-                  <input matInput formControlName="ubigeo" maxlength="6" inputmode="numeric">
-                  <mat-hint>6 dígitos del INEI, por ejemplo 150101</mat-hint>
-                  @if (perfilForm.controls.ubigeo.invalid && perfilForm.controls.ubigeo.touched) {
-                    <mat-error>El ubigeo debe tener 6 dígitos</mat-error>
-                  }
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>Departamento</mat-label>
-                  <input matInput formControlName="departamento" maxlength="100">
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>Provincia</mat-label>
-                  <input matInput formControlName="provincia" maxlength="100">
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>Distrito</mat-label>
-                  <input matInput formControlName="distrito" maxlength="100">
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>Teléfono (opcional)</mat-label>
-                  <input matInput formControlName="telefono" maxlength="30">
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>Correo (opcional)</mat-label>
-                  <input matInput type="email" formControlName="email" maxlength="120">
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>Serie de boletas electrónicas</mat-label>
-                  <input matInput formControlName="serieBoleta" maxlength="4">
-                  <mat-hint>B y tres caracteres, por ejemplo B001</mat-hint>
-                  @if (perfilForm.controls.serieBoleta.invalid && perfilForm.controls.serieBoleta.touched) {
-                    <mat-error>Usa el formato B001</mat-error>
-                  }
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>Serie de facturas</mat-label>
-                  <input matInput formControlName="serieFactura" maxlength="4">
-                  <mat-hint>F y tres caracteres, por ejemplo F001</mat-hint>
-                  @if (perfilForm.controls.serieFactura.invalid && perfilForm.controls.serieFactura.touched) {
-                    <mat-error>Usa el formato F001</mat-error>
-                  }
-                </mat-form-field>
-              </div>
-              @if (cambiaSerie()) {
-                <p class="aviso" role="alert">
-                  Al cambiar una serie, la numeración continúa después del último comprobante emitido en ella.
-                  Usa solo series autorizadas por SUNAT.
-                </p>
-              }
-              <div class="form-actions">
-                <button mat-raised-button color="primary" type="submit"
-                        [disabled]="guardandoPerfil() || perfilForm.invalid">
-                  @if (guardandoPerfil()) {
-                    <mat-spinner diameter="20"></mat-spinner>
-                  } @else {
-                    <ng-container><mat-icon>save</mat-icon> Guardar datos fiscales</ng-container>
-                  }
-                </button>
-              </div>
-            </form>
+            @if (!perfil()) {
+              <p class="form-help">
+                Primero registra los datos de la empresa (razón social, RUC, dirección…) en el módulo Farmacia.
+              </p>
+              <a mat-raised-button color="primary" routerLink="/farmacia">
+                <mat-icon>local_pharmacy</mat-icon> Ir a Farmacia
+              </a>
+            } @else {
+              <p class="form-help">
+                Emisor: <strong>{{ perfil()!.razonSocial }}</strong> · RUC {{ perfil()!.ruc }}.
+                <a routerLink="/farmacia">Editar datos de la empresa</a>
+              </p>
+              <form [formGroup]="seriesForm" (ngSubmit)="guardarSeries()">
+                <div class="form-grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Serie de boletas electrónicas</mat-label>
+                    <input matInput formControlName="serieBoleta" maxlength="4">
+                    <mat-hint>B y tres caracteres, por ejemplo B001</mat-hint>
+                    @if (seriesForm.controls.serieBoleta.invalid && seriesForm.controls.serieBoleta.touched) {
+                      <mat-error>Usa el formato B001</mat-error>
+                    }
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Serie de facturas</mat-label>
+                    <input matInput formControlName="serieFactura" maxlength="4">
+                    <mat-hint>F y tres caracteres, por ejemplo F001</mat-hint>
+                    @if (seriesForm.controls.serieFactura.invalid && seriesForm.controls.serieFactura.touched) {
+                      <mat-error>Usa el formato F001</mat-error>
+                    }
+                  </mat-form-field>
+                </div>
+                @if (cambiaSerie()) {
+                  <p class="aviso" role="alert">
+                    Al cambiar una serie, la numeración continúa después del último comprobante emitido en ella.
+                    Usa solo series autorizadas por SUNAT.
+                  </p>
+                }
+                <div class="form-actions">
+                  <button mat-raised-button color="primary" type="submit"
+                          [disabled]="guardandoPerfil() || seriesForm.invalid">
+                    @if (guardandoPerfil()) {
+                      <mat-spinner diameter="20"></mat-spinner>
+                    } @else {
+                      <ng-container><mat-icon>save</mat-icon> Guardar series</ng-container>
+                    }
+                  </button>
+                </div>
+              </form>
+            }
           </mat-card-content>
         </mat-card>
 
@@ -167,7 +141,7 @@ const MAX_CERTIFICADO_BYTES = 1_000_000;
           </mat-card-header>
           <mat-card-content>
             @if (!perfil()) {
-              <p class="form-help">Guarda primero los datos fiscales de la farmacia.</p>
+              <p class="form-help">Registra primero los datos de la empresa en el módulo Farmacia.</p>
             } @else {
               <form [formGroup]="credencialesForm" (ngSubmit)="guardarCredenciales()">
                 <div class="form-grid">
@@ -250,18 +224,9 @@ export class FacturacionComponent implements OnInit {
   nombreCertificado = signal<string | null>(null);
   errorCertificado = signal<string | null>(null);
 
-  perfilForm = this.fb.nonNullable.group({
-    ruc: ['', [Validators.required, Validators.pattern(/^\d{11}$/)]],
-    razonSocial: ['', Validators.required],
-    direccionFiscal: ['', Validators.required],
-    ubigeo: ['', [Validators.required, Validators.pattern(/^\d{6}$/)]],
-    departamento: ['', Validators.required],
-    provincia: ['', Validators.required],
-    distrito: ['', Validators.required],
-    telefono: [''],
-    email: ['', Validators.email],
-    serieBoleta: ['B001', [Validators.required, Validators.pattern(/^[Bb][A-Za-z0-9]{3}$/)]],
-    serieFactura: ['F001', [Validators.required, Validators.pattern(/^[Ff][A-Za-z0-9]{3}$/)]]
+  seriesForm = this.fb.nonNullable.group({
+    serieBoleta: [SERIE_BOLETA_INICIAL, [Validators.required, Validators.pattern(/^[Bb][A-Za-z0-9]{3}$/)]],
+    serieFactura: [SERIE_FACTURA_INICIAL, [Validators.required, Validators.pattern(/^[Ff][A-Za-z0-9]{3}$/)]]
   });
 
   credencialesForm = this.fb.nonNullable.group({
@@ -294,31 +259,37 @@ export class FacturacionComponent implements OnInit {
   cambiaSerie(): boolean {
     const perfil = this.perfil();
     if (!perfil) return false;
-    const { serieBoleta, serieFactura } = this.perfilForm.getRawValue();
+    const { serieBoleta, serieFactura } = this.seriesForm.getRawValue();
     return (!!perfil.serieBoleta && serieBoleta.trim().toUpperCase() !== perfil.serieBoleta)
       || serieFactura.trim().toUpperCase() !== perfil.serieFactura;
   }
 
-  guardarPerfil() {
-    if (this.perfilForm.invalid) {
-      this.perfilForm.markAllAsTouched();
+  /** Guarda las series conservando los datos de la empresa registrados en Farmacia. */
+  guardarSeries() {
+    const perfil = this.perfil();
+    if (!perfil || this.seriesForm.invalid) {
+      this.seriesForm.markAllAsTouched();
       return;
     }
     this.guardandoPerfil.set(true);
-    const v = this.perfilForm.getRawValue();
+    const v = this.seriesForm.getRawValue();
     this.facturacionService.guardarPerfil({
-      ...v,
-      ruc: v.ruc.trim(),
-      ubigeo: v.ubigeo.trim(),
+      ruc: perfil.ruc,
+      razonSocial: perfil.razonSocial,
+      direccionFiscal: perfil.direccionFiscal,
+      ubigeo: perfil.ubigeo,
+      departamento: perfil.departamento,
+      provincia: perfil.provincia,
+      distrito: perfil.distrito,
+      telefono: perfil.telefono,
+      email: perfil.email,
       serieBoleta: v.serieBoleta.trim().toUpperCase(),
-      serieFactura: v.serieFactura.trim().toUpperCase(),
-      telefono: v.telefono.trim() || null,
-      email: v.email.trim() || null
+      serieFactura: v.serieFactura.trim().toUpperCase()
     }).subscribe({
-      next: perfil => {
-        this.aplicarPerfil(perfil);
+      next: actualizado => {
+        this.aplicarPerfil(actualizado);
         this.guardandoPerfil.set(false);
-        this.snackBar.open('Datos fiscales guardados.', 'OK', { duration: 3000 });
+        this.snackBar.open('Series guardadas.', 'OK', { duration: 3000 });
       },
       error: () => this.guardandoPerfil.set(false)
     });
@@ -368,17 +339,8 @@ export class FacturacionComponent implements OnInit {
 
   private aplicarPerfil(perfil: SunatConfiguracion) {
     this.perfil.set(perfil);
-    this.perfilForm.patchValue({
-      ruc: perfil.ruc,
-      razonSocial: perfil.razonSocial,
-      direccionFiscal: perfil.direccionFiscal,
-      ubigeo: perfil.ubigeo,
-      departamento: perfil.departamento,
-      provincia: perfil.provincia,
-      distrito: perfil.distrito,
-      telefono: perfil.telefono ?? '',
-      email: perfil.email ?? '',
-      serieBoleta: perfil.serieBoleta ?? 'B001',
+    this.seriesForm.patchValue({
+      serieBoleta: perfil.serieBoleta ?? SERIE_BOLETA_INICIAL,
       serieFactura: perfil.serieFactura
     });
   }
