@@ -14,7 +14,7 @@ SOAP. No se encontró un workflow de CI versionado.
 - Facturación: Apache CXF/JAX-WS en personal; SUNAT SOAP 1.1, firma PKCS#12 y
   XML en ventas.
 - Infraestructura: Compose; PostgreSQL 16 local, RabbitMQ, servicios Java y
-  frontend. AWS inspeccionado: EC2 Ubuntu + Docker Compose y Aurora PostgreSQL
+  frontend. AWS inspeccionado: EC2 Ubuntu + Docker Compose y RDS for PostgreSQL 18
   en `us-east-2`.
 
 Versiones exactas de dependencias viven en `pom.xml`, POM de los módulos,

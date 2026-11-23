@@ -1,4 +1,4 @@
-# Infraestructura AWS: EC2 + Aurora/RDS
+# Infraestructura AWS: EC2 + RDS PostgreSQL
 
 Guía de contexto y operación para una persona o LLM que necesite entender el
 despliegue actual sin confundirlo con Docker Compose local. Es una instantánea,
@@ -11,7 +11,7 @@ lectura por SSH. **Región:** `us-east-2`. No se cambiaron recursos AWS.
 
 KipuSalud se ejecuta en una instancia EC2 Ubuntu 24.04 con Docker Compose. La
 base de datos PostgreSQL no corre en EC2: los seis servicios persistentes se
-conectan a Aurora PostgreSQL en RDS. RabbitMQ sí corre como contenedor en EC2.
+conectan a una instancia Amazon RDS for PostgreSQL 18.3 (no Aurora). RabbitMQ sí corre como contenedor en EC2.
 
 ```mermaid
 flowchart TD
@@ -33,7 +33,7 @@ flowchart TD
     Rabbit --> Catalog
     Rabbit --> Sales
   end
-  RDS[(Aurora PostgreSQL / RDS)]
+  RDS[(RDS for PostgreSQL)]
   Auth -->|PostgreSQL :5432| RDS
   Clients -->|PostgreSQL :5432| RDS
   Catalog -->|PostgreSQL :5432| RDS
@@ -43,7 +43,7 @@ flowchart TD
 ```
 
 El diagrama es una vista lógica. No prueba las reglas actuales de Security
-Groups, subnet routing ni el tipo de endpoint Aurora seleccionado. El frontend
+Groups ni el subnet routing. El frontend
 usa Nginx y `/api`; el API Gateway también tiene un port mapping publicado
 directamente en el host, cuya accesibilidad de red debe verificarse aparte.
 
@@ -94,20 +94,29 @@ Los contenedores de negocio, RabbitMQ, Eureka y Config Server están en la red
 Docker del Compose. Solo la tabla anterior describe puertos publicados; no
 infieras la exposición pública a partir de `EXPOSE` en Dockerfiles.
 
-### Aurora PostgreSQL / RDS
+### RDS for PostgreSQL
 
-Confirmado por la configuración efectiva del Compose remoto y el contexto de la
-consola AWS proporcionado por el usuario:
+**No es Aurora.** Verificado el 2026-11-23 con `aws rds describe-db-instances`
+(solo lectura):
 
-- Motor indicado: Aurora PostgreSQL en `us-east-2`.
-- Puerto PostgreSQL: `5432`.
-- Endpoint configurado: endpoint externo de Aurora. La consola lo identificó
-  como endpoint de instancia; el nombre DNS deliberadamente no se copia aquí.
-- Gateway/conectividad a Internet: desactivada según la pantalla compartida; la
-  propiedad RDS `PubliclyAccessible` no se consultó directamente.
-- Autenticación de base por IAM: desactivada según esa consola.
+| Propiedad | Valor observado |
+|---|---|
+| Identificador | `kipusalud-db` (instancia; no pertenece a un cluster) |
+| Motor | `postgres` 18.3 (Amazon RDS for PostgreSQL) |
+| Clase | `db.t4g.micro` |
+| Región | `us-east-2` |
+| Acceso público | No |
+| Multi-AZ | No (Single-AZ) |
+| Cifrado en reposo | Sí |
+| Almacenamiento | 20 GB |
+| Backups automáticos | Retención de **1 día**, ventana 05:22–05:52 UTC |
+| Protección contra borrado | **Desactivada** |
+| Snapshot manual | `kipusalud-antes-v9-20261123` (antes de la migración `ventas` V9) |
+
+- Puerto PostgreSQL: `5432`. El nombre DNS del endpoint no se copia aquí.
+- Autenticación de base por IAM: desactivada según la consola.
 - El contenedor local `psql` no participa; los servicios conectan desde EC2.
-- Los seis servicios configuran `POSTGRES_HOST` al mismo host externo; cada
+- Los seis servicios configuran `POSTGRES_HOST` al mismo endpoint; cada
   servicio selecciona una base lógica distinta:
 
   | Servicio | Base lógica |
@@ -119,39 +128,35 @@ consola AWS proporcionado por el usuario:
   | personal | `personal_db` |
   | auditoría | `auditoria_db` |
 
-Las bases son separación lógica sobre el mismo destino PostgreSQL, no seis
-clusters/instancias independientes. Compose inyecta nombres de variable
-`POSTGRES_USER`/`POSTGRES_PASSWORD`; no se comprobó si en RDS existen roles
-distintos y grants mínimos por servicio. El ejemplo de conexión PSQL de la
-consola usa valores por defecto de esa herramienta y no prueba qué usuario usa
-JDBC en la aplicación.
+Las bases son separación lógica sobre la misma instancia, no seis instancias
+independientes. Compose inyecta `POSTGRES_USER`/`POSTGRES_PASSWORD`; no se
+comprobó si existen roles distintos y grants mínimos por servicio.
 
-El nombre exacto de cluster/instancia, versión menor de PostgreSQL, clase de
-instancia RDS, estado writer/reader, endpoint de writer/cluster, subnet group,
-Availability Zones, Security Groups, retención de backups, protección contra
-borrado y política de snapshots **no se pudieron consultar en el control plane**:
-AWS CLI no estaba instalada en EC2 y no se hizo una consulta con credenciales de
-AWS. La configuración de aplicación prueba que hay un host externo, pero no
-prueba por sí sola el estado de todos esos recursos.
+Recomendaciones pendientes (requieren decisión del dueño de la cuenta): subir la
+retención de backups (por ejemplo a 7 días) y activar la protección contra
+borrado. Con 1 día de retención, un error detectado al día siguiente de una
+migración ya no tiene backup automático previo.
+
+Subnet group, Security Groups y reglas de entrada a 5432 no se consultaron.
 
 ### Estado del repositorio en EC2
 
 El servidor ejecutaba commit `7dd684f`, pero el worktree estaba sucio. El
-`docker-compose.yml` remoto se modificó localmente para apuntar a Aurora y hay
+`docker-compose.yml` remoto se modificó localmente para apuntar a RDS y hay
 archivos locales no versionados, incluidos respaldos. No leer, imprimir, copiar,
 versionar ni sobrescribir esos respaldos. No hacer `git pull`, build o checkout
 sin revisar primero la divergencia y acordar cómo conservar la configuración
-Aurora.
+de RDS.
 
 El Compose de Git aún configura un PostgreSQL local llamado `psql`, por lo que
 **un clon nuevo no recrea la topología actualmente desplegada**.
 
 No se encontraron archivos IaC versionados de Terraform/CloudFormation para
-crear EC2, Aurora, redes o Security Groups. Por ahora esta topología se debe
+crear EC2, RDS, redes o Security Groups. Por ahora esta topología se debe
 tratar como recursos configurados fuera del repositorio; no inferir que un
 `docker compose up` aprovisiona EC2 o RDS.
 
-## Conexión EC2 → Aurora y límites de seguridad
+## Conexión EC2 → RDS y límites de seguridad
 
 El modelo de red esperado es EC2 en la VPC → endpoint privado de RDS por TCP
 5432. Revisa en la consola autorizada que:
@@ -173,11 +178,11 @@ archivo CA explícitamente. No afirmar que pgJDBC valida identidad/cadena TLS
 hasta configurar y probarlo en los servicios; el ejemplo de consola no configura
 los contenedores.
 
-Aurora tiene endpoints distintos para cluster/writer e instancia. La consola
-informó que se eligió un endpoint de instancia. Antes de diseñar recuperación o
-failover, confirmar si se requiere el endpoint writer del cluster para que la
-aplicación siga al writer promovido. No cambies el hostname en Compose sin
-revisar cómo está configurada la topología y el failover.
+La instancia es Single-AZ: no hay failover automático. Si la instancia falla, la
+recuperación es restaurar un snapshot o un punto en el tiempo en una instancia
+nueva, lo que cambia el endpoint y obliga a actualizar `POSTGRES_HOST` en el
+Compose del servidor. No cambies el hostname en Compose sin una restauración o
+migración aprobada.
 
 ## Cómo debe inspeccionar una LLM
 
@@ -216,9 +221,9 @@ No instales AWS CLI ni solicites/guardes credenciales solo para documentar. Si
 el operador ya tiene una sesión AWS autorizada, recoge únicamente metadatos:
 
 - EC2: estado, tipo, AZ, subnet, SG, volúmenes EBS y fecha de lanzamiento.
-- RDS: tipo de recurso (cluster/instancia), motor/versión, writer, estado,
-  endpoint type, AZ, subnet group, SG, acceso público, backup retention,
-  deletion protection y ventana de mantenimiento.
+- RDS: motor/versión, clase, estado, AZ, Multi-AZ, subnet group, SG, acceso
+  público, backup retention, deletion protection, ventana de mantenimiento y
+  snapshots existentes.
 - Red: VPC, rutas, NACL/SG relevantes y origen de la regla 5432.
 
 Ejemplos de AWS CLI **solo lectura**; no pidas ni pongas claves en argumentos:
@@ -228,11 +233,11 @@ aws ec2 describe-instances --region us-east-2 \
   --filters Name=instance-id,Values=i-REPLACE_WITH_INSTANCE_ID \
   --query 'Reservations[].Instances[].{Type:InstanceType,State:State.Name,AZ:Placement.AvailabilityZone,Subnet:SubnetId,SecurityGroups:SecurityGroups[].GroupId,Volumes:BlockDeviceMappings[].Ebs.VolumeId}'
 
-aws rds describe-db-clusters --region us-east-2 \
-  --query 'DBClusters[].{Engine:Engine,Version:EngineVersion,Status:Status,Port:Port,BackupRetentionDays:BackupRetentionPeriod,DeletionProtection:DeletionProtection,SubnetGroup:DBSubnetGroup,Members:DBClusterMembers[].{Id:DBInstanceIdentifier,Writer:IsClusterWriter},SecurityGroups:VpcSecurityGroups[].VpcSecurityGroupId}'
+aws rds describe-db-instances --region us-east-2 --db-instance-identifier kipusalud-db \
+  --query 'DBInstances[].{Engine:Engine,Version:EngineVersion,Class:DBInstanceClass,Status:DBInstanceStatus,Public:PubliclyAccessible,MultiAZ:MultiAZ,AZ:AvailabilityZone,BackupRetentionDays:BackupRetentionPeriod,DeletionProtection:DeletionProtection,SubnetGroup:DBSubnetGroup.DBSubnetGroupName,SecurityGroups:VpcSecurityGroups[].VpcSecurityGroupId}'
 
-aws rds describe-db-instances --region us-east-2 \
-  --query 'DBInstances[].{Engine:Engine,Version:EngineVersion,Class:DBInstanceClass,Status:DBInstanceStatus,Public:PubliclyAccessible,AZ:AvailabilityZone,SubnetGroup:DBSubnetGroup.DBSubnetGroupName,SecurityGroups:VpcSecurityGroups[].VpcSecurityGroupId}'
+aws rds describe-db-snapshots --region us-east-2 --db-instance-identifier kipusalud-db \
+  --query 'DBSnapshots[].{Id:DBSnapshotIdentifier,Type:SnapshotType,Status:Status,Created:SnapshotCreateTime}'
 ```
 
 Filtra por los IDs identificados por el operador en vez de documentar todos los
@@ -264,16 +269,20 @@ pueden revelar nombres internos, topología o IDs de recursos.
 
 ### Backups y cambios
 
-- Confirma en RDS retención de automated backups, ventana, snapshots y
-  protección contra borrado. La instantánea actual no confirma ninguno.
+- Estado verificado el 2026-11-23: backups automáticos con retención de 1 día,
+  protección contra borrado desactivada, snapshot manual
+  `kipusalud-antes-v9-20261123` disponible. Revísalo de nuevo antes de operar.
 - Antes de migraciones: backup aprobado, estado Flyway, plan de rollback y
   validación de restore; un snapshot sin restore probado no es una prueba de
   recuperación.
-- No se debe cambiar `POSTGRES_HOST`, endpoint de cluster/instancia, Compose,
+- No se debe cambiar `POSTGRES_HOST`, el endpoint de RDS, Compose,
   Security Groups, EBS o RDS como parte de una tarea de documentación.
 - Para una actualización de aplicación, primero concilia el Compose remoto
-  modificado con la versión deseada sin eliminar los datos ni el override
-  Aurora; despliega solo con autorización expresa.
+  modificado con la versión deseada sin eliminar los datos ni el override de
+  RDS; despliega solo con autorización expresa. Alternativa usada el
+  2026-11-23: construir la imagen en local, copiarla con `docker save | ssh …
+  docker load` y recrear solo el servicio afectado (ver
+  [operaciones](operaciones.md#despliegue-realizado-el-2026-11-23)).
 
 ## Plantilla de inventario para mantener esta guía
 
@@ -287,7 +296,7 @@ completos, claves o contenido de `.env`.
 | EC2: VPC/subnet/SG/reglas ingress |  | Consola; redactar IPs de origen |
 | EC2: EBS/tamaño/uso de disco |  | Consola + `df -h /` |
 | Compose: commit/worktree/servicios/puertos |  | Host, solo lectura |
-| RDS: cluster/instancias/writer/versión |  | Consola o CLI read-only |
+| RDS: instancia/clase/versión/Multi-AZ |  | Consola o CLI read-only |
 | RDS: subnet group/SG/acceso público |  | Consola; no exponer DNS |
 | RDS: backups/retención/protección/restores |  | Consola + evidencia de restore |
 | JDBC: TLS/CA/hostname verification |  | Config efectiva + prueba |
@@ -297,11 +306,11 @@ completos, claves o contenido de `.env`.
 
 | Área | Compose versionado (desarrollo) | EC2 observado |
 |---|---|---|
-| PostgreSQL | Contenedor `psql` con seis bases | Aurora PostgreSQL externo; sin `psql` local |
+| PostgreSQL | Contenedor `psql` con seis bases | RDS for PostgreSQL 18.3 externo; sin `psql` local |
 | Servicios de aplicación | 11 app/infraestructura + `psql` | 11 app/infraestructura |
 | Gateway | `127.0.0.1:8080:8080` | `8080:8080` publicado al host |
 | Frontend | `80:80` | `80:80` |
-| Estado persistente | Volúmenes Docker local (PostgreSQL/RabbitMQ) | Aurora para DB; RabbitMQ mantiene volumen Docker local |
+| Estado persistente | Volúmenes Docker local (PostgreSQL/RabbitMQ) | RDS para DB; RabbitMQ mantiene volumen Docker local |
 
 No uses las tablas de “Compose local” como evidencia de AWS. La configuración
 efectiva del servidor y los metadatos autorizados de la cuenta prevalecen para

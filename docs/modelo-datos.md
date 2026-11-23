@@ -8,7 +8,7 @@ contenedor PostgreSQL 16 y seis bases: `auth_db`, `clientes_db`, `catalogo_db`,
 `database/init/01-create-databases.sh` crea las bases vacías; Flyway de cada
 servicio crea/actualiza su propio esquema.
 
-La instancia AWS inspeccionada conecta servicios a Aurora PostgreSQL, usando
+La instancia AWS inspeccionada conecta servicios a una instancia RDS for PostgreSQL 18, usando
 `POSTGRES_HOST`/`POSTGRES_PORT` externos, pero conserva esas seis bases lógicas.
 La configuración efectiva del servidor no está versionada en este repositorio.
 No añadas credenciales ni dumps a este documento.

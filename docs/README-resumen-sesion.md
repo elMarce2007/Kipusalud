@@ -62,7 +62,7 @@
 ## 4. Despliegue AWS — referencia histórica
 
 Este bloque describe un despliegue anterior a la migración de la base de datos a
-Aurora. Sus URLs, puertos y estados ya no son autoritativos. Se eliminaron de
+RDS PostgreSQL. Sus URLs, puertos y estados ya no son autoritativos. Se eliminaron de
 esta bitácora direcciones y credenciales que habían quedado expuestas; no las
 reconstruyas ni las reutilices.
 
