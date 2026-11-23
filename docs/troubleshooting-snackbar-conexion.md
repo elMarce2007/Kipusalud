@@ -1,11 +1,15 @@
 # Diagnóstico de conexión UI/API (KipuSalud en AWS)
 
-La aplicación se publica en `http://18.217.124.33`; Nginx sirve el frontend y reenvía `/api/` al API Gateway por la red interna de Docker. El gateway no necesita exponerse directamente a Internet.
+En la configuración descrita en este documento, Nginx sirve el frontend y
+reenvía `/api/` al API Gateway por la red interna de Docker. La URL pública y
+los puertos deben consultarse en la configuración autorizada del entorno; no se
+debe asumir que esta guía refleja el endpoint actual.
 
 ## Comprobar el problema
 
 1. En el navegador abre **F12 → Red/Network** y repite la acción.
-2. Las solicitudes deben ir a `http://18.217.124.33/api/...`, nunca a `localhost`.
+2. Las solicitudes deben ir al mismo origen del frontend (`/api/...`), nunca a
+   `localhost` en un bundle de producción.
 3. Interpreta el resultado:
    - `0` o `ERR_CONNECTION_REFUSED`: URL/base de API incorrecta o servidor inaccesible.
    - `401`: sesión ausente/expirada o credenciales de acceso incorrectas.
@@ -32,10 +36,17 @@ docker logs --since 15m kipusalud-gateway
 docker logs --since 15m kipusalud-auth
 ```
 
-Si se modificó frontend o gateway, actualiza el código y reconstruye en forma secuencial para no saturar la instancia:
+Si se modificó frontend o gateway, **no hagas `git pull` directamente en el
+servidor**: su `docker-compose.yml` tiene cambios locales no versionados (Aurora)
+y hay respaldos que deben preservarse. Primero sigue el
+[procedimiento de despliegue seguro](./operaciones.md#procedimiento-de-despliegue-seguro)
+y la [guía de infraestructura](./infraestructura-aws.md): revisa branch, commit
+y `git status --short`, y acuerda cómo conservar la configuración de Aurora.
+
+Solo con autorización expresa y el código ya actualizado, reconstruye en forma
+secuencial para no saturar la instancia:
 
 ```bash
-git pull --ff-only origin main
 docker compose --parallel 1 build frontend
 docker compose up -d --no-deps frontend
 ```

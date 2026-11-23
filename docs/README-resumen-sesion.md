@@ -2,6 +2,12 @@
 
 > Documento consolidado de todos los entregables, correcciones y avances de la sesión.
 > Proyecto: **Kipusalud** (sistema de gestión para farmacias — microservicios Spring Boot + Angular).
+>
+> **AVISO — BITÁCORA HISTÓRICA, NO FUENTE DE VERDAD OPERATIVA.** Los pasos,
+> URLs, puertos y estado AWS descritos abajo son de una implementación anterior.
+> Las credenciales y la IP pública que aparecían aquí fueron retiradas. Consulta
+> [operaciones.md](./operaciones.md) para el estado revisado el 2026-11-23; no
+> uses las instrucciones de despliegue de esta bitácora sin validarlas.
 
 ---
 
@@ -53,11 +59,12 @@
 
 ---
 
-## 4. Despliegue en AWS — estado actual
+## 4. Despliegue AWS — referencia histórica
 
-**Instancia:** EC2 Ubuntu 24.04, IP pública `18.217.124.33`, puerto app `4200`.
-**App URL:** `http://18.217.124.33:4200` ✅ (frontend servido por Nginx, HTTP 200 verificado).
-**Credenciales demo:** usuario `kipusalud_admin` / contraseña `KipuSalud2026!Admin` (creado por SQL en `auth_db`; `admin/admin123` ya no funciona porque la política exige ≥12 caracteres).
+Este bloque describe un despliegue anterior a la migración de la base de datos a
+Aurora. Sus URLs, puertos y estados ya no son autoritativos. Se eliminaron de
+esta bitácora direcciones y credenciales que habían quedado expuestas; no las
+reconstruyas ni las reutilices.
 
 ### Problemas resueltos durante el despliegue
 1. **`aws configure`** → output format: dejar vacío o `json`.
@@ -79,7 +86,7 @@
 
 ---
 
-## 5. Comandos clave de operación (en el servidor SSH)
+## 5. Comandos históricos de operación (no copiar sin revisar)
 
 ```bash
 cd ~/Kipusalud
@@ -93,15 +100,16 @@ git pull                                 # actualizar código tras push local
 Pruebas rápidas (sin levantar nada nuevo):
 ```bash
 curl -s http://localhost:8080/actuator/health          # gateway UP
-curl -s -X POST http://localhost:4200/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"kipusalud_admin","password":"KipuSalud2026!Admin"}'   # debe devolver token
 ```
+El ejemplo de login anterior se retiró porque contenía una credencial histórica.
+Para una prueba, usa una sesión demo temporal solo si está habilitada y copia sus
+credenciales efímeras directamente desde la respuesta del endpoint.
 
 ---
 
-## 6. Notas para el informe final
+## 6. Notas históricas para el informe final
 
-- Bloque sugerido: *"Aplicación desplegada en AWS EC2: http://18.217.124.33:4200 — Credenciales demo: kipusalud_admin / KipuSalud2026!Admin"*.
+- No copies endpoints o credenciales históricas a informes; verifica el entorno
+  actual y documenta solo URLs autorizadas, nunca credenciales.
 - Los diagramas visuales se generaron con **PlantUML** (casos de uso, clases, comunicación) y **Mermaid** (componentes, estados, arquitectura); el código fuente está embebido en `docs/entregables-uml-kipusalud.md` y las imágenes exportadas en `docs/diagrams/`.
 - La arquitectura desplegada coincide con el diagrama del anexo: 12 contenedores (frontend, gateway, 6 servicios de negocio, Eureka, Config Server, PostgreSQL, RabbitMQ) en una sola instancia EC2 mediante Docker Compose.
