@@ -111,6 +111,7 @@ export function htmlComprobante(d: DatosImpresion): string {
     ${filaTotal('IGV (18%)', totales.igv)}
     <tr class="total"><td>TOTAL</td><td class="num">${soles(Number(v.total))}</td></tr>
   </table>
+  ${v.registradoPor ? `<p>Atendido por: ${escapar(v.registradoPor)}</p>` : ''}
   <p>Pago: ${escapar(v.metodoPago ?? '')}
     ${v.metodoPago === 'EFECTIVO'
       ? ` · Recibido ${soles(Number(v.montoRecibido ?? 0))} · Vuelto ${soles(Number(v.vuelto ?? 0))}` : ''}</p>

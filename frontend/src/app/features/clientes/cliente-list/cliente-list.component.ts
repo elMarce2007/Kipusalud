@@ -17,6 +17,9 @@ import { ClienteClinicalDialogComponent } from '../cliente-clinical-dialog.compo
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../../shared/components/kpi-card/kpi-card.component';
 import { descargarCsv } from '../../../shared/utils/csv';
+import { VentaService } from '../../../services/venta.service';
+import { ResumenCliente } from '../../../models/venta.model';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 
 @Component({
   selector: 'app-cliente-list',
@@ -30,7 +33,9 @@ import { descargarCsv } from '../../../shared/utils/csv';
     MatIconModule,
     MatCardModule,
     PageHeaderComponent,
-    KpiCardComponent
+    KpiCardComponent,
+    CurrencyPipe,
+    DatePipe
   ],
   template: `
     <div class="page-container">
@@ -58,6 +63,8 @@ import { descargarCsv } from '../../../shared/utils/csv';
                       nota="RUC, razón social y dirección" />
         <app-kpi-card etiqueta="Con teléfono" [valor]="conTelefono()" icono="call"
                       nota="Contactables para recordatorios" />
+        <app-kpi-card etiqueta="Compraron (30 días)" [valor]="activos30()" icono="shopping_bag" tono="ok"
+                      nota="Clientes con compras recientes" />
       </section>
 
       <div class="filter-bar" role="search">
@@ -112,6 +119,18 @@ import { descargarCsv } from '../../../shared/utils/csv';
                 </td>
               </ng-container>
 
+              <ng-container matColumnDef="ultimaCompra">
+                <th mat-header-cell *matHeaderCellDef>Última compra</th>
+                <td mat-cell *matCellDef="let row">
+                  @if (resumenDe(row); as r) {
+                    {{ r.ultimaCompra | date:'dd/MM/yyyy' }}
+                    <small class="sub">{{ r.compras }} {{ r.compras === 1 ? 'compra' : 'compras' }} · {{ r.totalComprado | currency:'PEN':'S/ ' }}</small>
+                  } @else {
+                    <span class="sub">Sin compras</span>
+                  }
+                </td>
+              </ng-container>
+
               <ng-container matColumnDef="acciones">
                 <th mat-header-cell *matHeaderCellDef>Acciones</th>
                 <td mat-cell *matCellDef="let row">
@@ -137,7 +156,7 @@ import { descargarCsv } from '../../../shared/utils/csv';
               <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
 
               <tr class="mat-row" *matNoDataRow>
-                <td class="mat-cell" colspan="4" style="text-align: center; padding: 20px;">
+                <td class="mat-cell" colspan="5" style="text-align: center; padding: 20px;">
                   No se encontraron clientes con esos filtros
                 </td>
               </tr>
@@ -152,6 +171,7 @@ import { descargarCsv } from '../../../shared/utils/csv';
 })
 export class ClienteListComponent implements OnInit, AfterViewInit {
   private clienteService = inject(ClienteService);
+  private ventaService = inject(VentaService);
   private authService = inject(AuthService);
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);
@@ -162,13 +182,19 @@ export class ClienteListComponent implements OnInit, AfterViewInit {
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
 
-  displayedColumns = ['documento', 'nombres', 'factura', 'acciones'];
+  displayedColumns = ['documento', 'nombres', 'factura', 'ultimaCompra', 'acciones'];
   dataSource = new MatTableDataSource<Cliente>();
 
   clientes = signal<Cliente[]>([]);
   texto = signal('');
   tipo = signal('');
   facturables = computed(() => this.clientes().filter(c => clienteFacturable(c)).length);
+  resumenes = signal<Map<number, ResumenCliente>>(new Map());
+  activos30 = computed(() => {
+    const limite = Date.now() - 30 * 86_400_000;
+    return [...this.resumenes().values()].filter(r => new Date(r.ultimaCompra).getTime() >= limite).length;
+  });
+  resumenDe(c: Cliente): ResumenCliente | undefined { return c.id ? this.resumenes().get(c.id) : undefined; }
   conTelefono = computed(() => this.clientes().filter(c => !!c.telefono?.trim()).length);
 
   filtrados = computed(() => {
@@ -205,6 +231,11 @@ export class ClienteListComponent implements OnInit, AfterViewInit {
 
   cargarDatos() {
     this.loadError.set(null);
+    // Complementario: sin el resumen, la columna muestra "Sin compras".
+    this.ventaService.resumenClientes().subscribe({
+      next: r => this.resumenes.set(new Map(r.map(x => [x.clienteId, x]))),
+      error: err => console.error('No se pudo cargar el resumen de compras.', err)
+    });
     this.clienteService.listar().subscribe({
       next: data => this.clientes.set(data),
       error: err => {

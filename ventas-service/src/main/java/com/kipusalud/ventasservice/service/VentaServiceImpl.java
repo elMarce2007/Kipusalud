@@ -6,6 +6,7 @@ import com.kipusalud.security.TenantContext;
 import com.kipusalud.ventasservice.dto.DetalleVentaDto;
 import com.kipusalud.ventasservice.dto.SalidaVentaRequest;
 import com.kipusalud.ventasservice.dto.VentaDto;
+import com.kipusalud.ventasservice.dto.ResumenClienteDto;
 import com.kipusalud.ventasservice.entity.DetalleVenta;
 import com.kipusalud.ventasservice.entity.CorrelativoComprobante;
 import com.kipusalud.ventasservice.entity.Venta;
@@ -174,6 +175,14 @@ public class VentaServiceImpl implements VentaService {
         Venta venta = new Venta();
         venta.setFecha(LocalDateTime.now());
         venta.setClienteId(dto.clienteId());
+        venta.setRegistradoPor(TenantContext.requireUsername());
+        if (cliente != null) {
+            boolean factura = FACTURA.equals(tipoComprobante);
+            venta.setClienteNombre(recortar(factura && cliente.razonSocial() != null
+                    ? cliente.razonSocial() : unir(cliente.nombres(), cliente.apellidos()), 200));
+            venta.setClienteDocumento(factura ? "RUC " + cliente.ruc().trim()
+                    : cliente.dni() == null || cliente.dni().isBlank() ? null : "DNI " + cliente.dni().trim());
+        }
         venta.setFarmaciaId(farmaciaId);
         venta.setClaveIdempotencia(claveIdempotencia);
         venta.setHuellaSolicitud(huella);
@@ -288,6 +297,20 @@ public class VentaServiceImpl implements VentaService {
             String tipoComprobante
     ) {}
 
+    private static String unir(String nombres, String apellidos) {
+        return ((nombres == null ? "" : nombres.trim()) + " " + (apellidos == null ? "" : apellidos.trim())).trim();
+    }
+
+    private static String recortar(String valor, int maximo) {
+        if (valor == null || valor.isBlank()) return null;
+        return valor.length() <= maximo ? valor : valor.substring(0, maximo);
+    }
+
+    @Override
+    public List<ResumenClienteDto> resumenPorCliente() {
+        return ventaRepository.resumirPorCliente(TenantContext.requireFarmaciaId());
+    }
+
     private String validarTipoComprobante(String tipo) {
         if (tipo == null || tipo.isBlank()) {
             return BOLETA_INTERNA;
@@ -350,6 +373,7 @@ public class VentaServiceImpl implements VentaService {
                 v.getMetodoPago(), v.getMontoRecibido(), v.getVuelto(),
                 v.isConfirmacionManualPago(), v.getPagoConfirmadoPor(), v.getPagoConfirmadoEn(),
                 v.getClaveIdempotencia(), v.getEstado(), v.getTipoComprobante(),
-                v.getSerieComprobante(), v.getNumeroComprobante());
+                v.getSerieComprobante(), v.getNumeroComprobante(), v.getRegistradoPor(),
+                v.getClienteNombre(), v.getClienteDocumento());
     }
 }

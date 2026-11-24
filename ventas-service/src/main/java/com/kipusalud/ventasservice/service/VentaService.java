@@ -9,4 +9,5 @@ public interface VentaService {
     VentaDto obtener(Long id);
     VentaDto crear(VentaDto dto);
     VentaDto reintentar(Long id);
+    java.util.List<com.kipusalud.ventasservice.dto.ResumenClienteDto> resumenPorCliente();
 }

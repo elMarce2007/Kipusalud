@@ -75,6 +75,12 @@ import { LotesDeVenta } from '../../../models/inventario.model';
                 <strong>Cliente:</strong>
                 <span>{{ nombreCliente() }}</span>
               </div>
+              @if (venta()!.registradoPor) {
+                <div class="info-item">
+                  <strong>Atendido por:</strong>
+                  <span>{{ venta()!.registradoPor }}</span>
+                </div>
+              }
               <div class="info-item">
                 <strong>Estado:</strong>
                 <span>{{ venta()!.estado === 'CONFIRMADA' ? 'Confirmada' : venta()!.estado === 'PENDIENTE_STOCK' ? 'Pendiente de stock' : (venta()!.estado || '—') }}</span>
@@ -307,7 +313,10 @@ export class VentaDetalleComponent implements OnInit {
 
   nombreCliente = computed(() => {
     const c = this.cliente();
-    if (!c) return this.venta()?.clienteId ? `Cliente #${this.venta()!.clienteId}` : 'Público general';
+    const v = this.venta();
+    // La copia guardada al vender prevalece: el comprobante refleja los datos de ese momento.
+    if (v?.clienteNombre) return v.clienteNombre;
+    if (!c) return v?.clienteId ? `Cliente #${v.clienteId}` : 'Público general';
     return this.venta()?.tipoComprobante === 'FACTURA' && c.razonSocial?.trim()
       ? c.razonSocial.trim() : `${c.nombres} ${c.apellidos}`.trim();
   });
@@ -390,10 +399,12 @@ export class VentaDetalleComponent implements OnInit {
       venta: ventaImpresa,
       emisor: this.emisor(),
       nombreFarmacia: this.authService.usuario()?.farmaciaNombre ?? 'Farmacia',
-      cliente: c ? {
-        nombre: this.nombreCliente(),
-        documento: venta.tipoComprobante === 'FACTURA' && c.ruc ? `RUC ${c.ruc}` : c.dni ? `DNI ${c.dni}` : ''
-      } : null,
+      cliente: venta.clienteNombre
+        ? { nombre: venta.clienteNombre, documento: venta.clienteDocumento ?? '' }
+        : c ? {
+          nombre: this.nombreCliente(),
+          documento: venta.tipoComprobante === 'FACTURA' && c.ruc ? `RUC ${c.ruc}` : c.dni ? `DNI ${c.dni}` : ''
+        } : null,
       nombresProducto: this.nombresProducto(),
       estadoSunat: comprobante ? this.estadoComprobante().etiqueta : null
     }));

@@ -18,7 +18,7 @@ import { AuthService } from '../../services/auth.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
 import { etiquetaRol } from '../../core/utils/roles';
-import { Venta } from '../../models/venta.model';
+import { Venta, clienteDeVenta } from '../../models/venta.model';
 import { Producto } from '../../models/producto.model';
 
 @Component({
@@ -131,7 +131,8 @@ import { Producto } from '../../models/producto.model';
       <div class="charts-grid">
         <mat-card class="chart-card">
           <mat-card-header>
-            <mat-card-title>Ventas por Mes</mat-card-title>
+            <mat-card-title>Evolución de ventas de la semana</mat-card-title>
+            <mat-card-subtitle>Últimos 7 días · ventas confirmadas en soles</mat-card-subtitle>
           </mat-card-header>
           <mat-card-content>
             <canvas baseChart
@@ -144,14 +145,25 @@ import { Producto } from '../../models/producto.model';
 
         <mat-card class="chart-card">
           <mat-card-header>
-            <mat-card-title>Stock de Productos (Top 10 menor stock)</mat-card-title>
+            <mat-card-title>Últimas salidas de mostrador</mat-card-title>
+            <mat-card-subtitle>Comprobantes recientes y quién los despachó</mat-card-subtitle>
           </mat-card-header>
-          <mat-card-content>
-            <canvas baseChart
-                    [data]="stockChartData"
-                    [options]="stockChartOptions"
-                    type="bar">
-            </canvas>
+          <mat-card-content class="salidas">
+            <ul>
+              @for (v of ultimasVentas(); track v.id) {
+                <li>
+                  <div>
+                    <strong class="mono">{{ numeroVenta(v) }}</strong> · {{ v.fecha | date:'dd/MM HH:mm' }}
+                    <small>{{ resumenLineas(v) }}</small>
+                    <small>Despachó: {{ v.registradoPor || '—' }} · {{ clienteVenta(v) }}</small>
+                  </div>
+                  <strong class="num">{{ v.total | currency:'PEN':'S/ ' }}</strong>
+                </li>
+              } @empty {
+                <li class="vacio">Aún no hay ventas registradas.</li>
+              }
+            </ul>
+            <a mat-button routerLink="/ventas">Ver historial</a>
           </mat-card-content>
         </mat-card>
       </div>
@@ -162,6 +174,11 @@ import { Producto } from '../../models/producto.model';
       display: grid; gap: 16px; margin: 16px 0;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     }
+    .salidas ul { list-style: none; margin: 0; padding: 0; }
+    .salidas li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--kipu-line); }
+    .salidas small { display: block; color: var(--kipu-soft); font-size: 12px; }
+    .salidas .vacio { color: var(--kipu-soft); }
+    .chart-card mat-card-content.salidas { display: block; height: auto; }
     .icono { display: grid; place-items: center; border-radius: 50%; }
     .icono.ventas { background: #f6e3dd; color: #993522; }
     .icono.stock { background: #fbefd6; color: #8a5a00; }
@@ -192,6 +209,7 @@ export class DashboardComponent implements OnInit {
   readonly puedeVerInventario = this.authService.hasPermission('INVENTARIO:VER');
   readonly diasVencimiento = 30;
   ventasHoy = signal({ total: 0, cantidad: 0 });
+  ultimasVentas = signal<Venta[]>([]);
   saludo = computed(() => {
     const u = this.authService.usuario();
     const hoy = new Date().toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -292,9 +310,11 @@ export class DashboardComponent implements OnInit {
       ...this.ventasChartData,
       datasets: [{
         ...this.ventasChartData.datasets[0],
-        data: this.agruparVentasPorMes(ventas)
+        data: this.agruparVentasPorDia(ventas)
       }]
     };
+    this.ventasChartData = { ...this.ventasChartData, labels: this.etiquetasSemana() };
+    this.ultimasVentas.set(ventas.filter(v => v.estado === 'CONFIRMADA').slice(0, 5));
 
     const topProductos = [...productos]
       .sort((a, b) => a.stock - b.stock)
@@ -326,15 +346,40 @@ export class DashboardComponent implements OnInit {
       .sort((a, b) => a.stock / a.stockMinimo! - b.stock / b.stockMinimo!);
   }
 
-  private agruparVentasPorMes(ventas: Venta[]): number[] {
-    const meses = new Array(12).fill(0);
-    const anioActual = new Date().getFullYear();
-    ventas.forEach(v => {
-      const fecha = new Date(v.fecha);
-      if (fecha.getFullYear() === anioActual) {
-        meses[fecha.getMonth()] += v.total;
-      }
+  /** Los últimos 7 días, de hace seis días a hoy. */
+  private diasSemana(): Date[] {
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - 6 + i);
+      return d;
     });
-    return meses;
+  }
+
+  private etiquetasSemana(): string[] {
+    return this.diasSemana().map((d, i) => i === 6 ? 'Hoy'
+      : d.toLocaleDateString('es-PE', { weekday: 'short', day: 'numeric' }));
+  }
+
+  private agruparVentasPorDia(ventas: Venta[]): number[] {
+    const dias = this.diasSemana().map(d => d.toDateString());
+    const totales = new Array(7).fill(0);
+    ventas.filter(v => v.estado === 'CONFIRMADA').forEach(v => {
+      const i = dias.indexOf(new Date(v.fecha).toDateString());
+      if (i >= 0) totales[i] += Number(v.total ?? 0);
+    });
+    return totales.map(t => Math.round(t * 100) / 100);
+  }
+
+  numeroVenta(v: Venta): string {
+    return v.serieComprobante && v.numeroComprobante ? `${v.serieComprobante}-${v.numeroComprobante}` : `Venta #${v.id}`;
+  }
+
+  clienteVenta(v: Venta): string {
+    return clienteDeVenta(v);
+  }
+
+  resumenLineas(v: Venta): string {
+    return v.detalles.map(d => `${d.nombreProducto ?? 'Producto #' + d.productoId} (x${d.cantidad})`).join(', ');
   }
 }

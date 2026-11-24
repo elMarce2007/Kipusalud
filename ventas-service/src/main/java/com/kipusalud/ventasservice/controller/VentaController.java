@@ -81,6 +81,12 @@ public class VentaController {
         return ResponseEntity.ok(sunatConfiguracionService.guardarCredenciales(request));
     }
 
+    /** Compras confirmadas por cliente (número, total y última compra). */
+    @GetMapping("/clientes/resumen")
+    public ResponseEntity<List<com.kipusalud.ventasservice.dto.ResumenClienteDto>> resumenPorCliente() {
+        return ResponseEntity.ok(ventaService.resumenPorCliente());
+    }
+
     /** Comprobantes disponibles para el punto de venta; sin datos secretos. */
     @GetMapping("/facturacion/opciones")
     public ResponseEntity<OpcionesComprobanteDto> opcionesComprobante() {
