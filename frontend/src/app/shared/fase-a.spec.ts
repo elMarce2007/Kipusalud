@@ -34,3 +34,15 @@ describe('aCsv', () => {
       .toBe('A;B\r\n"x;y";\'=SUMA(1)\r\n"dice ""hola""";3');
   });
 });
+
+import { diasParaVencer, tonoVencimiento } from '../models/inventario.model';
+
+describe('vencimiento de lotes', () => {
+  it('calcula días y tono respecto de hoy', () => {
+    const hoy = new Date(2026, 10, 23);
+    expect(diasParaVencer('2026-11-30', hoy)).toBe(7);
+    expect(diasParaVencer('2026-11-22', hoy)).toBe(-1);
+    expect(diasParaVencer(null, hoy)).toBeNull();
+    expect(tonoVencimiento(null)).toBe('neutral');
+  });
+});

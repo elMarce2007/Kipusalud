@@ -10,5 +10,9 @@ public record MovimientoInventarioDto(
         Integer cantidad,
         String claveIdempotencia,
         String actor,
-        LocalDateTime creadoEn
+        LocalDateTime creadoEn,
+        String codigoLote,
+        java.time.LocalDate fechaVencimiento,
+        String motivo,
+        String observacion
 ) {}

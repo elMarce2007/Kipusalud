@@ -235,10 +235,19 @@ public class InventarioServiceImpl implements InventarioService {
         if (productoId == null || !productoRepository.existsByIdAndFarmaciaId(productoId, farmaciaId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado");
         }
+        Map<Long, LoteInventario> lotes = loteRepository
+                .findAllByFarmaciaIdAndProductoIdOrderByFechaVencimientoAscCreadoEnAsc(farmaciaId, productoId)
+                .stream().collect(Collectors.toMap(LoteInventario::getId, lote -> lote));
         return movimientoRepository.findAllByFarmaciaIdAndProductoIdOrderByCreadoEnDesc(farmaciaId, productoId)
-                .stream().map(m -> new MovimientoInventarioDto(
-                        m.getId(), m.getProductoId(), m.getLoteId(), m.getTipo(), m.getCantidad(),
-                        m.getClaveIdempotencia(), m.getActor(), m.getCreadoEn()))
+                .stream().map(m -> {
+                    LoteInventario lote = m.getLoteId() == null ? null : lotes.get(m.getLoteId());
+                    return new MovimientoInventarioDto(
+                            m.getId(), m.getProductoId(), m.getLoteId(), m.getTipo(), m.getCantidad(),
+                            m.getClaveIdempotencia(), m.getActor(), m.getCreadoEn(),
+                            lote == null ? null : lote.getCodigoLote(),
+                            lote == null ? null : lote.getFechaVencimiento(),
+                            m.getMotivo(), m.getObservacion());
+                })
                 .toList();
     }
 
@@ -267,6 +276,191 @@ public class InventarioServiceImpl implements InventarioService {
                             lote.getCantidadDisponible(), dias <= 7 ? "ALTA" : "MEDIA");
                 }).collect(Collectors.toCollection(ArrayList::new));
         return List.copyOf(alertas);
+    }
+
+    /** Motivos admitidos para dar de baja unidades de un lote. */
+    static final Set<String> MOTIVOS_AJUSTE =
+            Set.of("MERMA", "VENCIMIENTO", "DANIO", "CONTEO", "DEVOLUCION_PROVEEDOR", "OTRO");
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ResumenInventarioDto> resumen(int diasPorVencer) {
+        if (diasPorVencer < 1 || diasPorVencer > 365) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El rango de vencimiento debe ser de 1 a 365 días");
+        }
+        Long farmaciaId = TenantContext.requireFarmaciaId();
+        LocalDate hoy = LocalDate.now();
+        LocalDate limite = hoy.plusDays(diasPorVencer);
+        Map<Long, List<LoteInventario>> lotesPorProducto = loteRepository
+                .findAllByFarmaciaIdAndCantidadDisponibleGreaterThan(farmaciaId, 0).stream()
+                .collect(Collectors.groupingBy(LoteInventario::getProductoId));
+        return productoRepository.findAllByFarmaciaIdOrderByNombreAsc(farmaciaId).stream()
+                .map(producto -> resumirProducto(producto,
+                        lotesPorProducto.getOrDefault(producto.getId(), List.of()), hoy, limite))
+                .toList();
+    }
+
+    static ResumenInventarioDto resumirProducto(Producto producto, List<LoteInventario> lotes,
+                                                LocalDate hoy, LocalDate limitePorVencer) {
+        List<LoteInventario> vigentes = lotes.stream()
+                .filter(LoteInventario::isVerificado)
+                .filter(l -> l.getFechaVencimiento() != null && !l.getFechaVencimiento().isBefore(hoy))
+                .sorted(Comparator.comparing(LoteInventario::getFechaVencimiento)
+                        .thenComparing(LoteInventario::getCreadoEn))
+                .toList();
+        int vencidas = lotes.stream()
+                .filter(l -> l.getFechaVencimiento() != null && l.getFechaVencimiento().isBefore(hoy))
+                .mapToInt(LoteInventario::getCantidadDisponible).sum();
+        int porVencer = (int) vigentes.stream()
+                .filter(l -> !l.getFechaVencimiento().isAfter(limitePorVencer)).count();
+        ResumenInventarioDto.LoteFefo fefo = vigentes.isEmpty() ? null : new ResumenInventarioDto.LoteFefo(
+                vigentes.get(0).getId(), vigentes.get(0).getCodigoLote(),
+                vigentes.get(0).getFechaVencimiento(), vigentes.get(0).getCantidadDisponible());
+        return new ResumenInventarioDto(producto.getId(), producto.getStock(), producto.getStockMinimo(),
+                vigentes.size(), vencidas, porVencer, fefo);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AsignacionFefoDto simularFefo(Long productoId, int cantidad) {
+        if (cantidad < 1 || cantidad > 100_000) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad debe ser positiva");
+        }
+        Long farmaciaId = TenantContext.requireFarmaciaId();
+        if (productoId == null || !productoRepository.existsByIdAndFarmaciaId(productoId, farmaciaId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado");
+        }
+        LocalDate hoy = LocalDate.now();
+        List<LoteInventario> lotes = loteRepository.findSellableLots(farmaciaId, productoId, hoy);
+        int disponible = lotes.stream().mapToInt(LoteInventario::getCantidadDisponible).sum();
+        int asignable = Math.min(cantidad, disponible);
+        List<AsignacionFefoDto.LoteAsignado> asignados = asignable == 0 ? List.of()
+                : FefoAllocator.allocate(lotes, asignable, hoy).stream()
+                        .map(a -> new AsignacionFefoDto.LoteAsignado(a.lot().getId(), a.lot().getCodigoLote(),
+                                a.lot().getFechaVencimiento(), a.quantity()))
+                        .toList();
+        return new AsignacionFefoDto(productoId, cantidad, asignable == cantidad, cantidad - asignable, asignados);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SalidaVentaDto lotesDeVenta(String claveIdempotencia) {
+        if (claveIdempotencia == null || claveIdempotencia.isBlank() || claveIdempotencia.length() > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Clave de venta no válida");
+        }
+        Long farmaciaId = TenantContext.requireFarmaciaId();
+        SalidaInventario salida = salidaRepository
+                .findByFarmaciaIdAndClaveIdempotencia(farmaciaId, claveIdempotencia.trim())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "La venta no tiene salida de inventario registrada"));
+        return toSalidaDto(salida, true);
+    }
+
+    @Override
+    @Transactional
+    public AjusteInventarioDto registrarAjuste(AjusteInventarioRequest request) {
+        String rol = TenantContext.requireRole();
+        if (!"ADMINISTRADOR".equals(rol) && !"QF_REGENTE".equals(rol)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Solo el administrador o el químico farmacéutico pueden ajustar el stock");
+        }
+        validarAjuste(request);
+        Long farmaciaId = TenantContext.requireFarmaciaId();
+        String clave = "ajuste:" + request.claveIdempotencia().trim();
+        String motivo = request.motivo().trim().toUpperCase(Locale.ROOT);
+        String observacion = request.observacion() == null || request.observacion().isBlank()
+                ? null : request.observacion().trim();
+
+        Optional<MovimientoInventario> repetido = movimientoRepository.findByFarmaciaIdAndClaveIdempotencia(
+                farmaciaId, clave);
+        if (repetido.isPresent()) {
+            return ajusteRepetido(repetido.get(), request, motivo);
+        }
+
+        LoteInventario loteActual = loteRepository.findById(request.loteId())
+                .filter(l -> farmaciaId.equals(l.getFarmaciaId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lote no encontrado"));
+        // Mismo orden de bloqueo que las ventas (producto y luego lote) para evitar interbloqueos.
+        Producto producto = productoRepository.findByIdAndFarmaciaIdForUpdate(loteActual.getProductoId(), farmaciaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+        LoteInventario lote = loteRepository.findByIdAndFarmaciaIdForUpdate(request.loteId(), farmaciaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lote no encontrado"));
+        int cantidad = request.cantidad();
+        if (lote.getCantidadDisponible() < cantidad || producto.getStock() == null || producto.getStock() < cantidad) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El ajuste dejaría stock negativo: el lote " + lote.getCodigoLote() + " tiene "
+                            + lote.getCantidadDisponible() + " unidades");
+        }
+
+        lote.setCantidadDisponible(lote.getCantidadDisponible() - cantidad);
+        loteRepository.save(lote);
+        int stockAnterior = producto.getStock();
+        producto.setStock(stockAnterior - cantidad);
+        productoRepository.save(producto);
+
+        MovimientoInventario movimiento = new MovimientoInventario();
+        movimiento.setFarmaciaId(farmaciaId);
+        movimiento.setProductoId(producto.getId());
+        movimiento.setLoteId(lote.getId());
+        movimiento.setTipo("AJUSTE");
+        movimiento.setCantidad(-cantidad);
+        movimiento.setClaveIdempotencia(clave);
+        movimiento.setMotivo(motivo);
+        movimiento.setObservacion(observacion);
+        movimiento.setActor(TenantContext.requireUsername());
+        movimiento.setCreadoEn(LocalDateTime.now());
+        movimiento = movimientoRepository.save(movimiento);
+
+        domainEventOutbox.record("inventario.movimiento", producto.getId(), "inventory-adjustment:" + clave,
+                Map.of("producto", producto.getNombre(), "stock", producto.getStock(),
+                        "cantidadCambio", -cantidad, "tipo", "AJUSTE", "motivo", motivo,
+                        "loteId", lote.getId(), "codigoLote", lote.getCodigoLote()));
+        publicarCambioUmbral(producto, stockAnterior, producto.getStock(), clave);
+        return toAjusteDto(movimiento, lote, producto.getStock(), false);
+    }
+
+    private void validarAjuste(AjusteInventarioRequest request) {
+        if (request == null || request.claveIdempotencia() == null || request.claveIdempotencia().isBlank()
+                || request.claveIdempotencia().trim().length() > 90) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Se requiere una clave de idempotencia válida");
+        }
+        if (request.loteId() == null || request.cantidad() == null
+                || request.cantidad() < 1 || request.cantidad() > 1_000_000) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Indica el lote y una cantidad positiva a retirar");
+        }
+        String motivo = request.motivo() == null ? "" : request.motivo().trim().toUpperCase(Locale.ROOT);
+        if (!MOTIVOS_AJUSTE.contains(motivo)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El motivo del ajuste no es válido");
+        }
+        boolean sinObservacion = request.observacion() == null || request.observacion().isBlank();
+        if ("OTRO".equals(motivo) && sinObservacion) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Describe el motivo del ajuste");
+        }
+        if (!sinObservacion && request.observacion().trim().length() > 255) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La observación es demasiado larga");
+        }
+    }
+
+    private AjusteInventarioDto ajusteRepetido(MovimientoInventario movimiento, AjusteInventarioRequest request,
+                                               String motivo) {
+        if (!"AJUSTE".equals(movimiento.getTipo()) || !request.loteId().equals(movimiento.getLoteId())
+                || movimiento.getCantidad() != -request.cantidad() || !motivo.equals(movimiento.getMotivo())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "La clave de idempotencia ya se usó con otros datos");
+        }
+        LoteInventario lote = loteRepository.findById(movimiento.getLoteId())
+                .orElseThrow(() -> new IllegalStateException("Ajuste vinculado a un lote inexistente"));
+        int stock = productoRepository.findByIdAndFarmaciaId(movimiento.getProductoId(), movimiento.getFarmaciaId())
+                .map(Producto::getStock).orElse(0);
+        return toAjusteDto(movimiento, lote, stock, true);
+    }
+
+    private AjusteInventarioDto toAjusteDto(MovimientoInventario m, LoteInventario lote, int stock, boolean repetido) {
+        return new AjusteInventarioDto(m.getId(), m.getProductoId(), lote.getId(), lote.getCodigoLote(),
+                -m.getCantidad(), m.getMotivo(), m.getObservacion(), stock, lote.getCantidadDisponible(),
+                m.getActor(), m.getCreadoEn(), repetido);
     }
 
     private void validarIngreso(IngresoMercaderiaRequest request) {
@@ -407,7 +601,8 @@ public class InventarioServiceImpl implements InventarioService {
                             lote.getId(),
                             lote.getCodigoLote(),
                             Math.negateExact(movimiento.getCantidad()),
-                            movimiento.getCreadoEn());
+                            movimiento.getCreadoEn(),
+                            lote.getFechaVencimiento());
                 })
                 .toList();
         return new SalidaVentaDto(salida.getClaveIdempotencia(), repetida, lineas);

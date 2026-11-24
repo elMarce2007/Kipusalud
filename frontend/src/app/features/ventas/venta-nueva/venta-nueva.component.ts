@@ -5,7 +5,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { CurrencyPipe } from '@angular/common';
+import { CurrencyPipe, DatePipe } from '@angular/common';
+import { Subscription } from 'rxjs';
 
 import { ClienteService } from '../../../services/cliente.service';
 import { ProductoService } from '../../../services/producto.service';
@@ -19,6 +20,8 @@ import { OpcionesComprobante } from '../../../models/facturacion.model';
 import { createIdempotencyKey } from '../../../core/utils/idempotency-key';
 import { etiquetaRol } from '../../../core/utils/roles';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
+import { InventarioService } from '../../../services/inventario.service';
+import { AsignacionFefo, tonoVencimiento } from '../../../models/inventario.model';
 
 export { clienteFacturable } from '../../../models/cliente.model';
 
@@ -62,6 +65,7 @@ export function montosRapidos(total: number): number[] {
   standalone: true,
   imports: [
     CurrencyPipe,
+    DatePipe,
     RouterLink,
     MatButtonModule,
     MatIconModule,
@@ -143,12 +147,28 @@ export function montosRapidos(total: number): number[] {
             <div class="table-wrap">
               <table class="tabla-despacho">
                 <thead>
-                  <tr><th>Fármaco y presentación</th><th>Cant.</th><th class="num">P. unit</th><th class="num">Subtotal</th><th></th></tr>
+                  <tr><th>Fármaco y presentación</th><th>Asignación FEFO (lote / vcto)</th><th>Cant.</th><th class="num">P. unit</th><th class="num">Subtotal</th><th></th></tr>
                 </thead>
                 <tbody>
                   @for (d of detalles(); track d.productoId; let i = $index) {
                     <tr>
                       <td><strong>{{ d.productoNombre }}</strong>@if (d.descripcion) { <small>{{ d.descripcion }}</small> }</td>
+                      <td class="fefo">
+                        @if (fefo()[d.productoId]; as asignacion) {
+                          @for (l of asignacion.lotes; track l.loteId) {
+                            <span class="lote-fefo">
+                              <span class="status-dot" [class]="tonoVence(l.fechaVencimiento)"></span>
+                              <span class="mono">{{ l.codigoLote }}</span>
+                              <small>Vto: {{ l.fechaVencimiento | date:'dd/MM/yyyy' }}@if (asignacion.lotes.length > 1) { · {{ l.cantidad }} un. }</small>
+                            </span>
+                          }
+                          @if (!asignacion.completa) {
+                            <small class="faltante">Faltan {{ asignacion.faltante }} un. en lotes vigentes</small>
+                          }
+                        } @else {
+                          <small>Calculando…</small>
+                        }
+                      </td>
                       <td>
                         <div class="stepper">
                           <button type="button" aria-label="Quitar una unidad" (click)="cambiarCantidad(i, -1)">−</button>
@@ -162,13 +182,13 @@ export function montosRapidos(total: number): number[] {
                       <td><button mat-icon-button type="button" aria-label="Eliminar fila" (click)="eliminarDetalle(i)"><mat-icon>close</mat-icon></button></td>
                     </tr>
                   } @empty {
-                    <tr><td colspan="5" class="vacio">Busca un medicamento o toca un producto de alta rotación para agregarlo.</td></tr>
+                    <tr><td colspan="6" class="vacio">Busca un medicamento o toca un producto de alta rotación para agregarlo.</td></tr>
                   }
                 </tbody>
               </table>
             </div>
             <footer class="atajos"><span><kbd>F2</kbd> Buscar</span><span><kbd>F10</kbd> Registrar venta</span>
-              <span>El lote se asigna por FEFO al confirmar.</span></footer>
+              <span>Lotes según FEFO: primero vence, primero sale. Se confirman al registrar.</span></footer>
           </section>
         </div>
 
@@ -332,6 +352,10 @@ export function montosRapidos(total: number): number[] {
       font-size: 11px; font-weight: 600; letter-spacing: .06em; text-align: left; text-transform: uppercase; }
     .tabla-despacho td { padding: 12px; border-bottom: 1px solid var(--kipu-line); vertical-align: middle; }
     .tabla-despacho .num { text-align: right; }
+    .fefo .lote-fefo { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .fefo .lote-fefo .status-dot { margin-top: 0; }
+    .fefo small { color: var(--kipu-soft); }
+    .fefo .faltante { display: block; color: var(--kipu-danger-fg); font-weight: 600; }
     .stepper { display: inline-flex; align-items: center; gap: 4px; padding: 2px; border-radius: var(--kipu-radius-sm);
       background: var(--kipu-surface-high); }
     .stepper button { width: 28px; height: 28px; border: 0; border-radius: 4px; background: transparent; font-size: 18px; cursor: pointer; }
@@ -393,6 +417,7 @@ export class VentaNuevaComponent implements OnInit {
   private ventaService = inject(VentaService);
   private facturacionService = inject(FacturacionService);
   private authService = inject(AuthService);
+  private inventarioService = inject(InventarioService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private snackBar = inject(MatSnackBar);
@@ -400,6 +425,10 @@ export class VentaNuevaComponent implements OnInit {
   @ViewChild('buscador') buscador?: ElementRef<HTMLInputElement>;
 
   readonly metodos = METODOS_PAGO;
+  readonly tonoVence = tonoVencimiento;
+  /** Vista previa FEFO por producto (lotes que usará la venta según la cantidad actual). */
+  fefo = signal<Partial<Record<number, AsignacionFefo>>>({});
+  private consultasFefo = new Map<number, Subscription>();
   usuario = computed(() => this.authService.usuario()?.username ?? '');
   rol = computed(() => etiquetaRol(this.authService.usuario()?.rol));
 
@@ -549,6 +578,7 @@ export class VentaNuevaComponent implements OnInit {
         precioIncluyeIgv: producto.precioIncluyeIgv ?? null,
         stock: producto.stock
       }]);
+      this.actualizarFefo(producto.id!, 1);
       this.pendingVentaKey = null;
     }
     this.busqueda.set('');
@@ -571,10 +601,31 @@ export class VentaNuevaComponent implements OnInit {
       cantidad,
       subtotal: importeLinea(d.precioUnitario, cantidad, d.afectacionIgv, d.precioIncluyeIgv)
     } : d));
+    this.actualizarFefo(linea.productoId, cantidad);
     this.pendingVentaKey = null;
   }
 
+  /** Pide al inventario los lotes que usaría esta cantidad; descarta respuestas anteriores. */
+  private actualizarFefo(productoId: number, cantidad: number) {
+    this.consultasFefo.get(productoId)?.unsubscribe();
+    this.consultasFefo.set(productoId, this.inventarioService.simularFefo(productoId, cantidad).subscribe({
+      next: asignacion => this.fefo.update(f => ({ ...f, [productoId]: asignacion })),
+      error: err => console.error('No se pudo calcular la asignación FEFO.', err)
+    }));
+  }
+
+  private quitarFefo(productoId: number) {
+    this.consultasFefo.get(productoId)?.unsubscribe();
+    this.consultasFefo.delete(productoId);
+    this.fefo.update(f => {
+      const copia = { ...f };
+      delete copia[productoId];
+      return copia;
+    });
+  }
+
   vaciar() {
+    this.detalles().forEach(d => this.quitarFefo(d.productoId));
     this.detalles.set([]);
     this.pendingVentaKey = null;
   }
@@ -620,6 +671,8 @@ export class VentaNuevaComponent implements OnInit {
   }
 
   eliminarDetalle(index: number) {
+    const linea = this.detalles()[index];
+    if (linea) this.quitarFefo(linea.productoId);
     this.detalles.update(arr => arr.filter((_, i) => i !== index));
     this.pendingVentaKey = null;
   }

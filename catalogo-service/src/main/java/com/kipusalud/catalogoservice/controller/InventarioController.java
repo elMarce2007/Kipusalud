@@ -46,4 +46,31 @@ public class InventarioController {
             @RequestParam(defaultValue = "30") int diasVencimiento) {
         return ResponseEntity.ok(inventarioService.listarAlertas(diasVencimiento));
     }
+
+    /** Estado de cada producto con su lote FEFO activo y lotes por vencer. */
+    @GetMapping("/resumen")
+    public ResponseEntity<List<ResumenInventarioDto>> resumen(
+            @RequestParam(defaultValue = "60") int diasPorVencer) {
+        return ResponseEntity.ok(inventarioService.resumen(diasPorVencer));
+    }
+
+    /** Vista previa de los lotes que usaría una venta; no descuenta nada. */
+    @GetMapping("/productos/{productoId}/fefo")
+    public ResponseEntity<AsignacionFefoDto> simularFefo(
+            @PathVariable Long productoId, @RequestParam int cantidad) {
+        return ResponseEntity.ok(inventarioService.simularFefo(productoId, cantidad));
+    }
+
+    /** Lotes de los que salió cada producto de una venta (por su clave de idempotencia). */
+    @GetMapping("/ventas/{claveIdempotencia}/lotes")
+    public ResponseEntity<SalidaVentaDto> lotesDeVenta(@PathVariable String claveIdempotencia) {
+        return ResponseEntity.ok(inventarioService.lotesDeVenta(claveIdempotencia));
+    }
+
+    /** Baja de unidades de un lote (merma, vencimiento, daño, conteo, devolución). */
+    @PostMapping("/ajustes")
+    public ResponseEntity<AjusteInventarioDto> registrarAjuste(@RequestBody AjusteInventarioRequest request) {
+        AjusteInventarioDto ajuste = inventarioService.registrarAjuste(request);
+        return ResponseEntity.status(ajuste.repetido() ? HttpStatus.OK : HttpStatus.CREATED).body(ajuste);
+    }
 }

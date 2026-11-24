@@ -17,11 +17,13 @@ import { InventarioService } from '../../services/inventario.service';
 import { ProductoService } from '../../services/producto.service';
 import { createIdempotencyKey } from '../../core/utils/idempotency-key';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { ControlStockComponent } from './control-stock.component';
 
 @Component({
   selector: 'app-inventario',
   standalone: true,
   imports: [
+    ControlStockComponent,
     PageHeaderComponent,
     DatePipe,
     ReactiveFormsModule,
@@ -48,6 +50,9 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
       }
 
       <mat-tab-group>
+        <mat-tab label="Control de stock">
+          <app-control-stock />
+        </mat-tab>
         <mat-tab label="Registrar ingreso">
           <section class="tab-content">
             <mat-card>
