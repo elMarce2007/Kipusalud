@@ -84,6 +84,16 @@ pero eso solo habilita la interfaz. El endpoint backend también requiere
 antes de ofrecer sesiones demo. No documentes las contraseñas aleatorias
 devueltas por ese endpoint.
 
+Cada sesión demo crea una farmacia temporal con datos ficticios y coherentes
+(`auth-service/.../service/DemoDataset.java`): 9 categorías con código ATC y
+condición de venta, 25 productos con ficha y lotes con costo (incluido un lote
+vencido y lotes por vencer), unos 30 días de ventas despachadas por FEFO en los
+tres turnos, bajas de inventario, 16 clientes (2 empresas con RUC) y 6
+colaboradores con turno. La inserción y la limpieza están en
+`DemoTenantDatabase`; se pueden probar contra un PostgreSQL desechable con las
+migraciones de todos los servicios definiendo `DEMO_PG_PORT` (y
+`DEMO_PG_PASSWORD`) al ejecutar `DemoTenantDatabasePostgresTest`.
+
 No pongas valores secretos en Markdown, scripts, historial shell, logs,
 capturas ni commits. En AWS usa el mecanismo de secretos autorizado; la
 instantánea actual usa un `.env` local del servidor.

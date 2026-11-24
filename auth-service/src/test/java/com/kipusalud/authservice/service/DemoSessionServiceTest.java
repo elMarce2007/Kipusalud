@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class DemoSessionServiceTest {
@@ -67,7 +68,7 @@ class DemoSessionServiceTest {
         });
         verify(usuarioRepository, times(4)).save(any(Usuario.class));
         verify(sessionRepository).saveAndFlush(any(DemoSession.class));
-        verify(demoTenantDatabase).seed(27L);
+        verify(demoTenantDatabase).seed(eq(27L), any(DemoDataset.Usuarios.class));
     }
 
     @Test

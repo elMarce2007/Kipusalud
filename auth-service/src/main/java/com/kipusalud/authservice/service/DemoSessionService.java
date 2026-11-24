@@ -101,7 +101,9 @@ public class DemoSessionService {
 
         sessionRepository.saveAndFlush(new DemoSession(sessionId, farmacia.getId(), now, expiresAt));
         try {
-            demoTenantDatabase.seed(farmacia.getId());
+            demoTenantDatabase.seed(farmacia.getId(), new DemoDataset.Usuarios(
+                    credentials.get("ADMINISTRADOR").username(), credentials.get("GERENTE_SUPERVISOR").username(),
+                    credentials.get("QF_REGENTE").username(), credentials.get("EMPLEADO").username()));
         } catch (RuntimeException error) {
             LOGGER.error("No se pudo completar la inicialización de la sesión demo {}", sessionId, error);
             try {
