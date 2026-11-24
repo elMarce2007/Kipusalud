@@ -76,6 +76,7 @@ down -v`; los volúmenes PostgreSQL y RabbitMQ contienen persistencia.
 | `SUNAT_MASTER_KEY` | Base64 de 32 bytes para credenciales cifradas; debe mantenerse estable |
 | `SUNAT_ENVIRONMENT`, `SUNAT_BETA_URL`, `SUNAT_PRODUCTION_URL`, `SUNAT_PRODUCTION_ENABLED` | Entorno/endpoint SUNAT; producción deshabilitada por defecto |
 | `CATALOGO_SERVICE_URL`, `CLIENTE_SERVICE_URL` | Dependencias HTTP del servicio de ventas |
+| `KIPUSALUD_ZONA_HORARIA` | Zona horaria de la operación; por defecto `America/Lima` (ver abajo) |
 
 `frontend/src/environments/environment.prod.ts` tiene `demoAccessEnabled: true`,
 pero eso solo habilita la interfaz. El endpoint backend también requiere
@@ -86,6 +87,15 @@ devueltas por ese endpoint.
 No pongas valores secretos en Markdown, scripts, historial shell, logs,
 capturas ni commits. En AWS usa el mecanismo de secretos autorizado; la
 instantánea actual usa un `.env` local del servidor.
+
+### Zona horaria
+
+Los contenedores corren en UTC. `security-core` fija la zona `America/Lima` en todos los
+servicios de negocio al arrancar (`ZonaHorariaEnvironmentPostProcessor`), para que fechas
+y horas locales (ventas, Kardex, vencimientos FEFO, fecha de emisión SUNAT) sean las de
+Perú. Los `Instant` (sesiones demo, eventos) se siguen guardando en UTC
+(`hibernate.jdbc.time_zone=UTC`). Los registros con `LocalDateTime` creados antes del
+2026-11-24 quedaron en hora UTC (5 horas adelantados); no se convirtieron.
 
 ## Bases y migraciones
 
