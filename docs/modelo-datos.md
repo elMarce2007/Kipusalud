@@ -17,7 +17,7 @@ No añadas credenciales ni dumps a este documento.
 
 | Base | Tablas de negocio e infraestructura |
 |---|---|
-| `auth_db` | `usuarios`, `farmacias`, `usuario_permisos`, `demo_sessions`, `codigos_recuperacion` |
+| `auth_db` | `usuarios`, `farmacias`, `usuario_permisos`, `demo_sessions` |
 | `clientes_db` | `clientes`, `informacion_clinica_clientes`, `auditoria_acceso_clinico` |
 | `catalogo_db` | `categorias`, `productos`, `catalogo_importaciones_iniciales`, `domain_outbox`, `processed_domain_events` |
 | `catalogo_db`, schema `kipusalud_inventory` | `ingresos_mercaderia`, `lotes`, `movimientos_inventario`, `salidas_venta` |
@@ -37,9 +37,6 @@ exactas, índices, defaults y tipos SQL se definen en las migraciones.
   permisos adicionales.
 - `DemoSession`: `id` UUID, `farmaciaId`, `creadaEn`, `expiraEn`; apunta a una
   farmacia temporal y soporta vencimiento/limpieza.
-- `CodigoRecuperacion` (V7): usuario (FK con borrado en cascada), farmacia,
-  hash del código, intentos fallidos, vencimiento, uso y quién lo generó. Solo
-  el último código sin usar de cada usuario es válido.
 
 ### Clientes
 

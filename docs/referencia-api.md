@@ -18,8 +18,6 @@ Controlador: `auth-service/.../controller/AuthController.java`.
 | PUT | `/api/auth/usuarios/{id}` | `USUARIOS:GESTIONAR` |
 | GET | `/api/auth/farmacia` | `FARMACIA:VER` |
 | PUT | `/api/auth/farmacia` | `FARMACIA:EDITAR` |
-| POST | `/api/auth/usuarios/{id}/codigo-recuperacion` | `USUARIOS:GESTIONAR`; `201` con un código de 6 dígitos válido 15 min (se muestra una vez). No para el administrador ni la propia cuenta; el gerente solo para Empleado/Cajero; `409` si la cuenta está desactivada |
-| POST | `/api/auth/recuperar-password` | Público; `{farmaciaCodigo, username, codigo, nuevaPassword}`; `204`. Código de un solo uso, guardado con hash, invalidado tras 5 intentos o al generar otro; cualquier fallo devuelve el mismo `400` |
 | PUT | `/api/auth/mi-password` | Usuario autenticado; `{passwordActual, nuevaPassword}`; `204` |
 | POST | `/api/auth/demo/sessions` | Público solo si `DEMO_SESSIONS_ENABLED=true`; entrega una vez credenciales aleatorias de cuatro roles |
 

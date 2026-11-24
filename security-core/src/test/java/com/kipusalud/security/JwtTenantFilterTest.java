@@ -41,18 +41,12 @@ class JwtTenantFilterTest {
     }
 
     @Test
-    void passwordRecoveryIsPublicButCodesNeedUserManagement() throws Exception {
-        JwtTenantFilter filter = new JwtTenantFilter(JWT_SECRET, new ObjectMapper());
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/recuperar-password");
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        FilterChain chain = mock(FilterChain.class);
-        filter.doFilter(request, response, chain);
-        verify(chain).doFilter(request, response);
-
-        assertEquals(403, statusFor("EMPLEADO", "POST", "/api/auth/usuarios/5/codigo-recuperacion"));
-        assertEquals(403, statusFor("QF_REGENTE", "POST", "/api/auth/usuarios/5/codigo-recuperacion"));
-        assertEquals(200, statusFor("ADMINISTRADOR", "POST", "/api/auth/usuarios/5/codigo-recuperacion"));
+    void anyAuthenticatedUserCanChangeOwnPasswordButNotAnonymously() throws Exception {
         assertEquals(200, statusFor("EMPLEADO", "PUT", "/api/auth/mi-password"));
+        JwtTenantFilter filter = new JwtTenantFilter(JWT_SECRET, new ObjectMapper());
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(new MockHttpServletRequest("PUT", "/api/auth/mi-password"), response, mock(FilterChain.class));
+        assertEquals(401, response.getStatus());
     }
 
     @Test
