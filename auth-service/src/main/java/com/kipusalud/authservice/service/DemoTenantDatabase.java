@@ -10,7 +10,6 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,10 +32,16 @@ public class DemoTenantDatabase {
         this.password = password;
     }
 
-    public void seed(long farmaciaId) {
-        seedCatalog(farmaciaId);
-        seedClients(farmaciaId);
-        seedStaff(farmaciaId);
+    /**
+     * Siembra una farmacia de demostración con datos ficticios y coherentes (ver {@link DemoDataset}):
+     * catálogo con lotes, un mes de ventas, bajas, clientes y personal.
+     */
+    public void seed(long farmaciaId, DemoDataset.Usuarios usuarios) {
+        DemoDataset datos = DemoDataset.generar(farmaciaId, LocalDateTime.now(), usuarios);
+        List<Long> clientes = seedClients(farmaciaId, datos);
+        List<Long> productos = seedCatalog(farmaciaId, datos);
+        seedSales(farmaciaId, datos, productos, clientes);
+        seedStaff(farmaciaId, datos);
     }
 
     public void purge(long farmaciaId) {
@@ -47,149 +52,263 @@ public class DemoTenantDatabase {
         purgeAudit(farmaciaId);
     }
 
-    private void seedCatalog(long farmaciaId) {
-        inTransaction("catalogo_db", connection -> {
-            long analgesicos = insertCategory(connection, farmaciaId, "Analgésicos", "Productos para el dolor y la fiebre");
-            long vitaminas = insertCategory(connection, farmaciaId, "Vitaminas", "Vitaminas y suplementos");
-            insertProductWithBatch(connection, farmaciaId, analgesicos, "Paracetamol 500 mg x 20", "Producto de demostración", 8.50, 25);
-            insertProductWithBatch(connection, farmaciaId, vitaminas, "Vitamina C 1000 mg x 30", "Producto de demostración", 15.00, 18);
+    private List<Long> seedClients(long farmaciaId, DemoDataset datos) {
+        return inTransaction("clientes_db", connection -> {
+            List<Long> ids = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO clientes (nombres, apellidos, dni, telefono, email, ruc, razon_social, "
+                            + "direccion_fiscal, farmacia_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")) {
+                for (DemoDataset.Cliente c : datos.clientes) {
+                    statement.setString(1, c.nombres());
+                    statement.setString(2, c.apellidos());
+                    statement.setString(3, c.dni());
+                    statement.setString(4, c.telefono());
+                    statement.setString(5, c.email());
+                    statement.setString(6, c.ruc());
+                    statement.setString(7, c.razonSocial());
+                    statement.setString(8, c.direccionFiscal());
+                    statement.setLong(9, farmaciaId);
+                    ids.add(returningId(statement, "cliente"));
+                }
+            }
+            return ids;
+        });
+    }
+
+    private List<Long> seedCatalog(long farmaciaId, DemoDataset datos) {
+        return inTransaction("catalogo_db", connection -> {
+            List<Long> categorias = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO categorias (nombre, descripcion, codigo_atc, condicion_venta, farmacia_id) "
+                            + "VALUES (?, ?, ?, ?, ?) RETURNING id")) {
+                for (DemoDataset.Categoria c : datos.categorias) {
+                    statement.setString(1, c.nombre());
+                    statement.setString(2, c.descripcion());
+                    statement.setString(3, c.codigoAtc());
+                    statement.setString(4, c.condicionVenta());
+                    statement.setLong(5, farmaciaId);
+                    categorias.add(returningId(statement, "categoría"));
+                }
+            }
+
+            List<Long> productos = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO productos (nombre, descripcion, precio, stock, categoria_id, farmacia_id, stock_minimo, "
+                            + "afectacion_igv, precio_incluye_igv, principio_activo, laboratorio, presentacion, "
+                            + "registro_sanitario, codigo_barras, ubicacion) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, ?, '10', TRUE, ?, ?, ?, ?, ?, ?) RETURNING id")) {
+                for (int i = 0; i < datos.productos.size(); i++) {
+                    DemoDataset.Producto p = datos.productos.get(i);
+                    statement.setString(1, p.nombre());
+                    statement.setString(2, p.presentacion());
+                    statement.setBigDecimal(3, p.precio());
+                    statement.setInt(4, datos.stockDe(i));
+                    statement.setLong(5, categorias.get(p.categoria()));
+                    statement.setLong(6, farmaciaId);
+                    statement.setInt(7, datos.stockMinimo.get(i));
+                    statement.setString(8, p.principioActivo());
+                    statement.setString(9, p.laboratorio());
+                    statement.setString(10, p.presentacion());
+                    statement.setString(11, p.registroSanitario());
+                    statement.setString(12, p.codigoBarras());
+                    statement.setString(13, p.ubicacion());
+                    productos.add(returningId(statement, "producto"));
+                }
+            }
+
+            List<Long> ingresos = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO kipusalud_inventory.ingresos_mercaderia "
+                            + "(farmacia_id, clave_idempotencia, huella_solicitud, referencia_documento, creado_por, creado_en) "
+                            + "VALUES (?, ?, ?, ?, ?, ?) RETURNING id")) {
+                for (DemoDataset.Ingreso ingreso : datos.ingresos) {
+                    statement.setLong(1, farmaciaId);
+                    statement.setString(2, "demo-ingreso-" + UUID.randomUUID());
+                    statement.setString(3, huella());
+                    statement.setString(4, ingreso.referencia());
+                    statement.setString(5, ingreso.actor());
+                    statement.setObject(6, ingreso.fecha());
+                    ingresos.add(returningId(statement, "ingreso"));
+                }
+            }
+
+            List<Long> lotes = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO kipusalud_inventory.lotes (farmacia_id, producto_id, codigo_lote, fecha_vencimiento, "
+                            + "cantidad_inicial, cantidad_disponible, verificado, creado_en, costo_unitario) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, TRUE, ?, ?) RETURNING id")) {
+                for (DemoDataset.Lote lote : datos.lotes) {
+                    statement.setLong(1, farmaciaId);
+                    statement.setLong(2, productos.get(lote.producto));
+                    statement.setString(3, lote.codigo);
+                    statement.setDate(4, Date.valueOf(lote.vence));
+                    statement.setInt(5, lote.inicial);
+                    statement.setInt(6, lote.disponible);
+                    statement.setObject(7, lote.creado);
+                    statement.setBigDecimal(8, lote.costo);
+                    lotes.add(returningId(statement, "lote"));
+                }
+            }
+
+            try (PreparedStatement movimiento = connection.prepareStatement(
+                    "INSERT INTO kipusalud_inventory.movimientos_inventario (farmacia_id, producto_id, lote_id, ingreso_id, "
+                            + "salida_id, tipo, cantidad, clave_idempotencia, actor, creado_en, motivo, observacion) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                 PreparedStatement salida = connection.prepareStatement(
+                         "INSERT INTO kipusalud_inventory.salidas_venta "
+                                 + "(farmacia_id, clave_idempotencia, huella_solicitud, creado_por, creado_en) "
+                                 + "VALUES (?, ?, ?, ?, ?) RETURNING id")) {
+                for (int i = 0; i < datos.lotes.size(); i++) {
+                    DemoDataset.Lote lote = datos.lotes.get(i);
+                    agregarMovimiento(movimiento, farmaciaId, productos.get(lote.producto), lotes.get(i),
+                            ingresos.get(lote.ingreso), null, "INGRESO", lote.inicial, "demo-ingreso-" + UUID.randomUUID(),
+                            datos.ingresos.get(lote.ingreso).actor(), lote.creado, null, null);
+                }
+                for (DemoDataset.Venta venta : datos.ventas) {
+                    String huella = huella();
+                    salida.setLong(1, farmaciaId);
+                    salida.setString(2, claveVenta(farmaciaId, venta));
+                    salida.setString(3, huella);
+                    salida.setString(4, venta.vendedor());
+                    salida.setObject(5, venta.fecha());
+                    long salidaId = returningId(salida, "salida");
+                    int indice = 0;
+                    for (DemoDataset.Linea linea : venta.lineas()) {
+                        for (DemoDataset.Asignacion a : linea.lotes()) {
+                            agregarMovimiento(movimiento, farmaciaId, productos.get(linea.producto()), lotes.get(a.lote()),
+                                    null, salidaId, "VENTA", -a.cantidad(), "venta-" + huella.substring(0, 32) + "-" + indice++,
+                                    venta.vendedor(), venta.fecha(), null, null);
+                        }
+                    }
+                }
+                for (DemoDataset.Ajuste ajuste : datos.ajustes) {
+                    DemoDataset.Lote lote = datos.lotes.get(ajuste.lote());
+                    agregarMovimiento(movimiento, farmaciaId, productos.get(lote.producto), lotes.get(ajuste.lote()),
+                            null, null, "AJUSTE", -ajuste.cantidad(), "demo-ajuste-" + UUID.randomUUID(), ajuste.actor(),
+                            ajuste.fecha(), ajuste.motivo(), ajuste.observacion());
+                }
+                movimiento.executeBatch();
+            }
+            return productos;
+        });
+    }
+
+    private void seedSales(long farmaciaId, DemoDataset datos, List<Long> productos, List<Long> clientes) {
+        inTransaction("ventas_db", connection -> {
+            try (PreparedStatement venta = connection.prepareStatement(
+                    "INSERT INTO ventas (fecha, cliente_id, total, farmacia_id, metodo_pago, monto_recibido, vuelto, "
+                            + "confirmacion_manual_pago, pago_confirmado_por, pago_confirmado_en, clave_idempotencia, "
+                            + "huella_solicitud, estado, tipo_comprobante, serie_comprobante, numero_comprobante, "
+                            + "registrado_por, cliente_nombre, cliente_documento) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CONFIRMADA', 'BOLETA_INTERNA', ?, ?, ?, ?, ?) "
+                            + "RETURNING id");
+                 PreparedStatement detalle = connection.prepareStatement(
+                         "INSERT INTO detalle_ventas (producto_id, cantidad, precio_unitario, subtotal, nombre_producto, "
+                                 + "afectacion_igv, precio_incluye_igv) VALUES (?, ?, ?, ?, ?, '10', TRUE) RETURNING id");
+                 PreparedStatement union = connection.prepareStatement(
+                         "INSERT INTO ventas_detalles (venta_id, detalles_id) VALUES (?, ?)")) {
+                for (DemoDataset.Venta v : datos.ventas) {
+                    boolean efectivo = "EFECTIVO".equals(v.metodoPago());
+                    DemoDataset.Cliente cliente = v.cliente() == null ? null : datos.clientes.get(v.cliente());
+                    venta.setObject(1, v.fecha());
+                    venta.setObject(2, v.cliente() == null ? null : clientes.get(v.cliente()));
+                    venta.setBigDecimal(3, v.total());
+                    venta.setLong(4, farmaciaId);
+                    venta.setString(5, v.metodoPago());
+                    venta.setBigDecimal(6, v.recibido());
+                    venta.setBigDecimal(7, v.vuelto());
+                    venta.setBoolean(8, !efectivo);
+                    venta.setString(9, efectivo ? null : v.vendedor());
+                    venta.setObject(10, efectivo ? null : v.fecha());
+                    venta.setString(11, claveVenta(farmaciaId, v));
+                    venta.setString(12, huella());
+                    venta.setString(13, DemoDataset.SERIE_INTERNA);
+                    venta.setString(14, "%08d".formatted(v.numero()));
+                    venta.setString(15, v.vendedor());
+                    venta.setString(16, cliente == null ? null : cliente.nombres() + " " + cliente.apellidos());
+                    venta.setString(17, cliente == null ? null : cliente.dni());
+                    long ventaId = returningId(venta, "venta");
+                    for (DemoDataset.Linea linea : v.lineas()) {
+                        detalle.setLong(1, productos.get(linea.producto()));
+                        detalle.setInt(2, linea.cantidad());
+                        detalle.setBigDecimal(3, linea.precio());
+                        detalle.setBigDecimal(4, linea.subtotal());
+                        detalle.setString(5, datos.productos.get(linea.producto()).nombre());
+                        long detalleId = returningId(detalle, "detalle de venta");
+                        union.setLong(1, ventaId);
+                        union.setLong(2, detalleId);
+                        union.addBatch();
+                    }
+                }
+                union.executeBatch();
+            }
+            try (PreparedStatement correlativo = connection.prepareStatement(
+                    "INSERT INTO correlativos_comprobante (farmacia_id, serie, siguiente_numero) VALUES (?, ?, ?)")) {
+                correlativo.setLong(1, farmaciaId);
+                correlativo.setString(2, DemoDataset.SERIE_INTERNA);
+                correlativo.setLong(3, datos.ventas.size() + 1L);
+                correlativo.executeUpdate();
+            }
             return null;
         });
     }
 
-    private long insertCategory(Connection connection, long farmaciaId, String nombre, String descripcion)
-            throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(
-                "INSERT INTO categorias (nombre, descripcion, farmacia_id) VALUES (?, ?, ?) RETURNING id")) {
-            statement.setString(1, nombre);
-            statement.setString(2, descripcion);
-            statement.setLong(3, farmaciaId);
-            try (ResultSet result = statement.executeQuery()) {
-                if (!result.next()) throw new SQLException("No se pudo crear una categoría demo");
-                return result.getLong(1);
-            }
-        }
-    }
-
-    private void insertProductWithBatch(
-            Connection connection, long farmaciaId, long categoriaId, String nombre,
-            String descripcion, double precio, int cantidad) throws SQLException {
-        long productoId;
-        try (PreparedStatement statement = connection.prepareStatement(
-                "INSERT INTO productos (nombre, descripcion, precio, stock, categoria_id, farmacia_id, "
-                        + "stock_minimo, afectacion_igv, precio_incluye_igv) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, 3, '10', TRUE) RETURNING id")) {
-            statement.setString(1, nombre);
-            statement.setString(2, descripcion);
-            statement.setBigDecimal(3, java.math.BigDecimal.valueOf(precio));
-            statement.setInt(4, cantidad);
-            statement.setLong(5, categoriaId);
-            statement.setLong(6, farmaciaId);
-            try (ResultSet result = statement.executeQuery()) {
-                if (!result.next()) throw new SQLException("No se pudo crear un producto demo");
-                productoId = result.getLong(1);
-            }
-        }
-
-        String idempotencyKey = "demo-opening-" + UUID.randomUUID();
-        String fingerprint = UUID.randomUUID().toString().replace("-", "");
-        fingerprint += fingerprint;
-        LocalDateTime created = LocalDateTime.now();
-        long ingresoId;
-        try (PreparedStatement statement = connection.prepareStatement(
-                "INSERT INTO kipusalud_inventory.ingresos_mercaderia "
-                        + "(farmacia_id, clave_idempotencia, huella_solicitud, referencia_documento, creado_por, creado_en) "
-                        + "VALUES (?, ?, ?, ?, ?, ?) RETURNING id")) {
-            statement.setLong(1, farmaciaId);
-            statement.setString(2, idempotencyKey);
-            statement.setString(3, fingerprint);
-            statement.setString(4, "LOTE DEMO");
-            statement.setString(5, "demo");
-            statement.setObject(6, created);
-            try (ResultSet result = statement.executeQuery()) {
-                if (!result.next()) throw new SQLException("No se pudo crear el ingreso demo");
-                ingresoId = result.getLong(1);
-            }
-        }
-
-        long loteId;
-        try (PreparedStatement statement = connection.prepareStatement(
-                "INSERT INTO kipusalud_inventory.lotes "
-                        + "(farmacia_id, producto_id, codigo_lote, fecha_vencimiento, cantidad_inicial, "
-                        + "cantidad_disponible, verificado, creado_en) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, TRUE, ?) RETURNING id")) {
-            statement.setLong(1, farmaciaId);
-            statement.setLong(2, productoId);
-            statement.setString(3, "DEMO-" + productoId);
-            statement.setDate(4, Date.valueOf(LocalDate.now().plusYears(2)));
-            statement.setInt(5, cantidad);
-            statement.setInt(6, cantidad);
-            statement.setObject(7, created);
-            try (ResultSet result = statement.executeQuery()) {
-                if (!result.next()) throw new SQLException("No se pudo crear un lote demo");
-                loteId = result.getLong(1);
-            }
-        }
-
-        try (PreparedStatement statement = connection.prepareStatement(
-                "INSERT INTO kipusalud_inventory.movimientos_inventario "
-                        + "(farmacia_id, producto_id, lote_id, ingreso_id, tipo, cantidad, clave_idempotencia, actor, creado_en) "
-                        + "VALUES (?, ?, ?, ?, 'INGRESO', ?, ?, 'demo', ?)")) {
-            statement.setLong(1, farmaciaId);
-            statement.setLong(2, productoId);
-            statement.setLong(3, loteId);
-            statement.setLong(4, ingresoId);
-            statement.setInt(5, cantidad);
-            statement.setString(6, idempotencyKey);
-            statement.setObject(7, created);
-            statement.executeUpdate();
-        }
-    }
-
-    private void seedClients(long farmaciaId) {
-        inTransaction("clientes_db", connection -> {
+    private void seedStaff(long farmaciaId, DemoDataset datos) {
+        inTransaction("personal_db", connection -> {
             try (PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO clientes (nombres, apellidos, dni, telefono, email, farmacia_id) "
-                            + "VALUES (?, ?, ?, ?, ?, ?)")) {
-                addClient(statement, farmaciaId, 1, "Ana", "Demo", "900000001");
-                addClient(statement, farmaciaId, 2, "Luis", "Prueba", "900000002");
+                    "INSERT INTO personal (nombres, apellidos, cargo, email, dni, colegiatura, telefono, turno, activo, "
+                            + "farmacia_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE, ?)")) {
+                for (DemoDataset.Colaborador c : datos.personal) {
+                    statement.setString(1, c.nombres());
+                    statement.setString(2, c.apellidos());
+                    statement.setString(3, c.cargo());
+                    statement.setString(4, c.email());
+                    statement.setString(5, c.dni());
+                    statement.setString(6, c.colegiatura());
+                    statement.setString(7, c.telefono());
+                    statement.setString(8, c.turno());
+                    statement.setLong(9, farmaciaId);
+                    statement.addBatch();
+                }
                 statement.executeBatch();
             }
             return null;
         });
     }
 
-    private void addClient(PreparedStatement statement, long farmaciaId, int index, String nombres,
-                          String apellidos, String telefono) throws SQLException {
-        statement.setString(1, nombres);
-        statement.setString(2, apellidos);
-        statement.setString(3, String.format("%08d", (farmaciaId % 1_000_000) * 100 + index));
-        statement.setString(4, telefono);
-        statement.setString(5, "demo" + index + "@example.invalid");
-        statement.setLong(6, farmaciaId);
+    private static void agregarMovimiento(PreparedStatement statement, long farmaciaId, long productoId, long loteId,
+                                          Long ingresoId, Long salidaId, String tipo, int cantidad, String clave,
+                                          String actor, LocalDateTime fecha, String motivo, String observacion)
+            throws SQLException {
+        statement.setLong(1, farmaciaId);
+        statement.setLong(2, productoId);
+        statement.setLong(3, loteId);
+        statement.setObject(4, ingresoId);
+        statement.setObject(5, salidaId);
+        statement.setString(6, tipo);
+        statement.setInt(7, cantidad);
+        statement.setString(8, clave);
+        statement.setString(9, actor);
+        statement.setObject(10, fecha);
+        statement.setString(11, motivo);
+        statement.setString(12, observacion);
         statement.addBatch();
     }
 
-    private void seedStaff(long farmaciaId) {
-        inTransaction("personal_db", connection -> {
-            try (PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO personal (nombres, apellidos, cargo, email, farmacia_id) VALUES (?, ?, ?, ?, ?)")) {
-                statement.setString(1, "Patricia");
-                statement.setString(2, "Demo");
-                statement.setString(3, "Químico Farmacéutico");
-                statement.setString(4, "qf@example.invalid");
-                statement.setLong(5, farmaciaId);
-                statement.addBatch();
-                statement.setString(1, "Carlos");
-                statement.setString(2, "Prueba");
-                statement.setString(3, "Cajero");
-                statement.setString(4, "cajero@example.invalid");
-                statement.setLong(5, farmaciaId);
-                statement.addBatch();
-                statement.executeBatch();
-            }
-            return null;
-        });
+    /** La salida de inventario usa la misma clave que la venta, como en el flujo real. */
+    private static String claveVenta(long farmaciaId, DemoDataset.Venta venta) {
+        return "demo-venta-" + farmaciaId + "-" + venta.numero();
+    }
+
+    private static String huella() {
+        return (UUID.randomUUID().toString() + UUID.randomUUID()).replace("-", "");
+    }
+
+    private static long returningId(PreparedStatement statement, String entidad) throws SQLException {
+        try (ResultSet result = statement.executeQuery()) {
+            if (!result.next()) throw new SQLException("No se pudo crear el registro demo: " + entidad);
+            return result.getLong(1);
+        }
     }
 
     private void purgeCatalog(long farmaciaId) {
@@ -249,6 +368,7 @@ public class DemoTenantDatabase {
             }
             execute(connection, "DELETE FROM ventas WHERE farmacia_id = ?", farmaciaId);
             execute(connection, "DELETE FROM sunat_configuraciones WHERE farmacia_id = ?", farmaciaId);
+            execute(connection, "DELETE FROM correlativos_comprobante WHERE farmacia_id = ?", farmaciaId);
             return null;
         });
     }
