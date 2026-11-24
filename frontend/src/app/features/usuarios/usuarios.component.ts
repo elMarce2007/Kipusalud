@@ -10,11 +10,13 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { AuthService, UsuarioFarmacia } from '../../services/auth.service';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
 @Component({
   selector: 'app-usuarios',
   standalone: true,
   imports: [
+    PageHeaderComponent,
     ReactiveFormsModule,
     MatButtonModule,
     MatCardModule,
@@ -28,12 +30,7 @@ import { AuthService, UsuarioFarmacia } from '../../services/auth.service';
   ],
   template: `
     <div class="page-container">
-      <div class="page-header">
-        <div>
-          <p class="eyebrow">Acceso al sistema</p>
-          <h1>Usuarios de la farmacia</h1>
-        </div>
-      </div>
+      <app-page-header titulo="Usuarios de la farmacia" [migas]="[{ etiqueta: 'Usuarios' }]" />
 
       <p class="users-intro">
         Crea cuentas según la responsabilidad de cada persona. Empleado y Cajero comparten el

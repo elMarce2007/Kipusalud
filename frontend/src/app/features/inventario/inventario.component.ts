@@ -16,11 +16,13 @@ import { Producto } from '../../models/producto.model';
 import { InventarioService } from '../../services/inventario.service';
 import { ProductoService } from '../../services/producto.service';
 import { createIdempotencyKey } from '../../core/utils/idempotency-key';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
 @Component({
   selector: 'app-inventario',
   standalone: true,
   imports: [
+    PageHeaderComponent,
     DatePipe,
     ReactiveFormsModule,
     MatButtonModule,
@@ -34,14 +36,10 @@ import { createIdempotencyKey } from '../../core/utils/idempotency-key';
     MatTabsModule
   ],
   template: `
-    <main class="page-container">
-      <header class="page-header">
-        <div>
-          <p class="eyebrow">Trazabilidad por lote</p>
-          <h1>Inventario y Kardex</h1>
-          <p class="intro">Registra ingresos con lote y vencimiento, y consulta movimientos y alertas.</p>
-        </div>
-      </header>
+    <div class="page-container">
+      <app-page-header titulo="Control de stock e inventario" [migas]="[{ etiqueta: 'Inventario' }]"
+                       insignia="FEFO activo"
+                       descripcion="Registra ingresos con lote y vencimiento, y consulta movimientos y alertas." />
 
       @if (pageError()) {
         <div class="load-error" role="alert">
@@ -244,7 +242,7 @@ import { createIdempotencyKey } from '../../core/utils/idempotency-key';
           </section>
         </mat-tab>
       </mat-tab-group>
-    </main>
+    </div>
   `,
   styles: [`
     .intro, .help, .section-heading p { color: #57423e; }

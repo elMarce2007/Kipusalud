@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { MatIconRegistry } from '@angular/material/icon';
 
 @Component({
   selector: 'app-root',
@@ -8,4 +9,9 @@ import { RouterOutlet } from '@angular/router';
   template: `<router-outlet />`,
   styles: []
 })
-export class App {}
+export class App {
+  constructor() {
+    // Los diseños de Stitch usan iconos de contorno (outlined) en toda la interfaz.
+    inject(MatIconRegistry).setDefaultFontSetClass('material-icons-outlined');
+  }
+}

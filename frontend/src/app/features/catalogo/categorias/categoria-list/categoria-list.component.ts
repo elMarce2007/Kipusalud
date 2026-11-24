@@ -14,11 +14,13 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { CategoriaService } from '../../../../services/categoria.service';
 import { Categoria } from '../../../../models/categoria.model';
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 
 @Component({
   selector: 'app-categoria-list',
   standalone: true,
   imports: [
+    PageHeaderComponent,
     RouterLink,
     MatTableModule,
     MatPaginatorModule,
@@ -31,15 +33,12 @@ import { ConfirmDialogComponent } from '../../../../shared/components/confirm-di
   ],
   template: `
     <div class="page-container">
-      <div class="page-header">
-        <div>
-          <p class="eyebrow">Organización del catálogo</p>
-          <h1>Categorías</h1>
-        </div>
+      <app-page-header titulo="Categorías y familias terapéuticas"
+                       [migas]="[{ etiqueta: 'Catálogo' }, { etiqueta: 'Categorías' }]">
         <button mat-raised-button color="primary" routerLink="nuevo">
-          <mat-icon>add</mat-icon> Nueva Categoria
+          <mat-icon>add_circle</mat-icon> Nueva categoría
         </button>
-      </div>
+      </app-page-header>
 
       @if (loadError()) {
         <div class="load-error" role="alert">
