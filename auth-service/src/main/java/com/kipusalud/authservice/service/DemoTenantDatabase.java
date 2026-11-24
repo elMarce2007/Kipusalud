@@ -127,7 +127,7 @@ public class DemoTenantDatabase {
                     statement.setString(3, huella());
                     statement.setString(4, ingreso.referencia());
                     statement.setString(5, ingreso.actor());
-                    statement.setObject(6, ingreso.fecha());
+                    statement.setObject(6, utc(ingreso.fecha()));
                     ingresos.add(returningId(statement, "ingreso"));
                 }
             }
@@ -144,7 +144,7 @@ public class DemoTenantDatabase {
                     statement.setDate(4, Date.valueOf(lote.vence));
                     statement.setInt(5, lote.inicial);
                     statement.setInt(6, lote.disponible);
-                    statement.setObject(7, lote.creado);
+                    statement.setObject(7, utc(lote.creado));
                     statement.setBigDecimal(8, lote.costo);
                     lotes.add(returningId(statement, "lote"));
                 }
@@ -170,7 +170,7 @@ public class DemoTenantDatabase {
                     salida.setString(2, claveVenta(farmaciaId, venta));
                     salida.setString(3, huella);
                     salida.setString(4, venta.vendedor());
-                    salida.setObject(5, venta.fecha());
+                    salida.setObject(5, utc(venta.fecha()));
                     long salidaId = returningId(salida, "salida");
                     int indice = 0;
                     for (DemoDataset.Linea linea : venta.lineas()) {
@@ -210,7 +210,7 @@ public class DemoTenantDatabase {
                 for (DemoDataset.Venta v : datos.ventas) {
                     boolean efectivo = "EFECTIVO".equals(v.metodoPago());
                     DemoDataset.Cliente cliente = v.cliente() == null ? null : datos.clientes.get(v.cliente());
-                    venta.setObject(1, v.fecha());
+                    venta.setObject(1, utc(v.fecha()));
                     venta.setObject(2, v.cliente() == null ? null : clientes.get(v.cliente()));
                     venta.setBigDecimal(3, v.total());
                     venta.setLong(4, farmaciaId);
@@ -219,7 +219,7 @@ public class DemoTenantDatabase {
                     venta.setBigDecimal(7, v.vuelto());
                     venta.setBoolean(8, !efectivo);
                     venta.setString(9, efectivo ? null : v.vendedor());
-                    venta.setObject(10, efectivo ? null : v.fecha());
+                    venta.setObject(10, efectivo ? null : utc(v.fecha()));
                     venta.setString(11, claveVenta(farmaciaId, v));
                     venta.setString(12, huella());
                     venta.setString(13, DemoDataset.SERIE_INTERNA);
@@ -289,10 +289,20 @@ public class DemoTenantDatabase {
         statement.setInt(7, cantidad);
         statement.setString(8, clave);
         statement.setString(9, actor);
-        statement.setObject(10, fecha);
+        statement.setObject(10, utc(fecha));
         statement.setString(11, motivo);
         statement.setString(12, observacion);
         statement.addBatch();
+    }
+
+    /**
+     * Los servicios guardan las marcas de tiempo en UTC ({@code hibernate.jdbc.time_zone=UTC}) y las
+     * muestran en la zona de la operación (America/Lima). Los datos demo se generan en hora local,
+     * así que se convierten igual antes de insertarlos.
+     */
+    static LocalDateTime utc(LocalDateTime local) {
+        return local == null ? null
+                : local.atZone(java.time.ZoneId.systemDefault()).withZoneSameInstant(java.time.ZoneOffset.UTC).toLocalDateTime();
     }
 
     /** La salida de inventario usa la misma clave que la venta, como en el flujo real. */

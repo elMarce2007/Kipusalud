@@ -99,4 +99,16 @@ class DemoDatasetTest {
         assertTrue(d.personal.stream().map(DemoDataset.Colaborador::dni).allMatch(x -> x.matches("\\d{8}")));
         assertEquals(DemoDataset.generar(7L, AHORA, USUARIOS).ventas.size(), d.ventas.size(), "determinista");
     }
+
+    @Test
+    void lasHorasSeGuardanEnUtcComoLosServicios() {
+        java.util.TimeZone original = java.util.TimeZone.getDefault();
+        try {
+            java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("America/Lima"));
+            assertEquals(LocalDateTime.of(2026, 11, 24, 17, 9), DemoTenantDatabase.utc(LocalDateTime.of(2026, 11, 24, 12, 9)));
+            assertEquals(LocalDateTime.of(2026, 11, 25, 4, 30), DemoTenantDatabase.utc(LocalDateTime.of(2026, 11, 24, 23, 30)));
+        } finally {
+            java.util.TimeZone.setDefault(original);
+        }
+    }
 }
