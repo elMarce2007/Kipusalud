@@ -28,20 +28,6 @@ export interface ActualizarUsuarioFarmacia {
   permisos: string[];
 }
 
-/** Código de un solo uso que el administrador entrega en persona al colaborador. */
-export interface CodigoRecuperacion {
-  username: string;
-  codigo: string;
-  expiraEn: string;
-}
-
-export interface RecuperarPasswordRequest {
-  farmaciaCodigo: string;
-  username: string;
-  codigo: string;
-  nuevaPassword: string;
-}
-
 export interface Farmacia {
   id: number;
   nombre: string;
@@ -138,28 +124,10 @@ export class AuthService {
     return this.http.put<UsuarioFarmacia>(`${this.apiUrl}/usuarios/${id}`, data);
   }
 
-  /** Público: restablece la contraseña con el código entregado por el administrador. */
-  recuperarPassword(data: RecuperarPasswordRequest): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/recuperar-password`, data, {
-      context: new HttpContext().set(MENSAJES_POR_ESTADO, {
-        400: 'El código no es válido o ya venció. Pide uno nuevo al administrador.'
-      })
-    });
-  }
-
   cambiarPassword(passwordActual: string, nuevaPassword: string): Observable<void> {
     return this.http.put<void>(`${this.apiUrl}/mi-password`, { passwordActual, nuevaPassword }, {
       context: new HttpContext().set(MENSAJES_POR_ESTADO, {
         400: 'La contraseña actual no es correcta o la nueva no cumple los requisitos.'
-      })
-    });
-  }
-
-  generarCodigoRecuperacion(usuarioId: number): Observable<CodigoRecuperacion> {
-    return this.http.post<CodigoRecuperacion>(`${this.apiUrl}/usuarios/${usuarioId}/codigo-recuperacion`, {}, {
-      context: new HttpContext().set(MENSAJES_POR_ESTADO, {
-        403: 'No puedes generar un código para esta cuenta.',
-        409: 'La cuenta está desactivada; actívala antes de generar un código.'
       })
     });
   }

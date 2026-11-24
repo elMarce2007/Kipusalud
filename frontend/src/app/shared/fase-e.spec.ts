@@ -4,7 +4,7 @@ import { participacion, rangoDelMes } from '../models/reporte.model';
 import { columnasDeTurnos } from '../features/personal/turnos/turnos.util';
 import { Personal } from '../models/personal.model';
 
-describe('Fase E: reportes, recuperación y turnos', () => {
+describe('Fase E: reportes, contraseñas y turnos', () => {
   it('genera un ZIP válido con CRC32 estándar', () => {
     expect(crc32(new TextEncoder().encode('123456789'))).toBe(0xcbf43926);
     const bytes = crearXlsx([{ nombre: 'Kardex', filas: [['A', 'B'], [1, 'x & <y>']] }]);

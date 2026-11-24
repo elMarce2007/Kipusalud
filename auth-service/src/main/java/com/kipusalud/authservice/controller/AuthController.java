@@ -19,35 +19,20 @@ import java.util.List;
 public class AuthController {
 
     private final AuthService authService;
-    private final com.kipusalud.authservice.service.RecuperacionPasswordService recuperacionService;
+    private final com.kipusalud.authservice.service.CambioPasswordService cambioPasswordService;
 
     public AuthController(AuthService authService,
-                          com.kipusalud.authservice.service.RecuperacionPasswordService recuperacionService) {
+                          com.kipusalud.authservice.service.CambioPasswordService cambioPasswordService) {
         this.authService = authService;
-        this.recuperacionService = recuperacionService;
-    }
-
-    /** Público: restablece la contraseña con el código entregado por el administrador. */
-    @PostMapping("/recuperar-password")
-    public ResponseEntity<Void> recuperarPassword(
-            @RequestBody com.kipusalud.authservice.dto.RecuperarPasswordRequest request) {
-        recuperacionService.recuperar(request);
-        return ResponseEntity.noContent().build();
+        this.cambioPasswordService = cambioPasswordService;
     }
 
     /** Usuario autenticado: cambia su propia contraseña. */
     @PutMapping("/mi-password")
     public ResponseEntity<Void> cambiarPassword(
             @RequestBody com.kipusalud.authservice.dto.CambiarPasswordRequest request) {
-        recuperacionService.cambiarPropia(request);
+        cambioPasswordService.cambiarPropia(request);
         return ResponseEntity.noContent().build();
-    }
-
-    /** USUARIOS:GESTIONAR: genera un código de recuperación de un solo uso para un colaborador. */
-    @PostMapping("/usuarios/{id}/codigo-recuperacion")
-    public ResponseEntity<com.kipusalud.authservice.dto.CodigoRecuperacionDto> generarCodigoRecuperacion(
-            @PathVariable Long id) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(recuperacionService.generarCodigo(id));
     }
 
     @PostMapping("/login")
