@@ -94,6 +94,7 @@ import { environment } from '../../../../environments/environment';
                 <mat-error>La contraseña es obligatoria</mat-error>
               }
             </mat-form-field>
+            <a class="olvide" routerLink="/auth/recuperar">¿Olvidaste tu contraseña?</a>
 
             <button mat-raised-button color="primary"
                     type="submit"
@@ -150,6 +151,7 @@ import { environment } from '../../../../environments/environment';
     </div>
   `,
   styles: `
+    .olvide { display: block; margin: -6px 0 14px; text-align: right; color: var(--kipu-primary); font-size: 13px; }
     .demo-access { display: grid; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e8e2d6; }
     .demo-access > p { margin: 0; color: #57423e; font-size: 13px; }
     .demo-pharmacy { font-weight: 600; }

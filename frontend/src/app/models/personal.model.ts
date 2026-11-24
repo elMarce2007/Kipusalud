@@ -21,6 +21,14 @@ export const TURNOS: { valor: Turno; etiqueta: string }[] = [
   { valor: 'ROTATIVO', etiqueta: 'Rotativo' }
 ];
 
+/** Horario de cada turno; coincide con el reporte de ventas por turno del servidor. */
+export const HORARIO_TURNO: Record<Turno, string> = {
+  MANANA: '07:00 – 15:00',
+  TARDE: '15:00 – 23:00',
+  NOCHE: '23:00 – 07:00',
+  ROTATIVO: 'Según programación'
+};
+
 export function etiquetaTurno(valor: string | null | undefined): string {
   return TURNOS.find(t => t.valor === valor)?.etiqueta ?? 'Sin turno';
 }

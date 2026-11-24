@@ -9,7 +9,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
-import { AuthService, UsuarioFarmacia } from '../../services/auth.service';
+import { AuthService, CodigoRecuperacion, UsuarioFarmacia } from '../../services/auth.service';
+import { DatePipe } from '@angular/common';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
 @Component({
@@ -26,7 +27,8 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
     MatInputModule,
     MatProgressSpinnerModule,
     MatSelectModule,
-    MatTableModule
+    MatTableModule,
+    DatePipe
   ],
   template: `
     <div class="page-container">
@@ -46,6 +48,22 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 
       @if (mensaje()) {
         <p class="success-message" role="status">{{ mensaje() }}</p>
+      }
+
+      @if (codigo(); as c) {
+        <section class="codigo-recuperacion" role="status" aria-live="polite">
+          <div>
+            <span class="kpi-label">Código de recuperación para {{ c.username }}</span>
+            <strong class="digitos">{{ c.codigo }}</strong>
+            <p>
+              Entrégalo en persona. Vence a las {{ c.expiraEn | date:'HH:mm' }}, sirve una sola vez y se bloquea
+              tras 5 intentos. El colaborador lo ingresa en «¿Olvidaste tu contraseña?» de la pantalla de inicio.
+            </p>
+          </div>
+          <button mat-icon-button type="button" aria-label="Ocultar código" (click)="codigo.set(null)">
+            <mat-icon>close</mat-icon>
+          </button>
+        </section>
       }
 
       <div class="users-grid">
@@ -164,6 +182,12 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                             Guardar permisos
                           </button>
                         }
+                        @if (puedeGenerarCodigo(user)) {
+                          <button mat-button type="button" [disabled]="savingUserId() === user.id"
+                                  (click)="generarCodigo(user)">
+                            <mat-icon>password</mat-icon> Código de recuperación
+                          </button>
+                        }
                         <button mat-button type="button" [disabled]="savingUserId() === user.id"
                                 (click)="cambiarEstado(user)">
                           {{ user.activo ? 'Desactivar' : 'Activar' }}
@@ -201,6 +225,11 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
     .empty-state { padding: 20px; color: var(--kipu-muted); text-align: center; }
     .success-message { padding: 12px 16px; background: #c2edce; color: #294e38; border-radius: 8px; }
     .muted { color: var(--kipu-muted); }
+    .codigo-recuperacion { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 20px; padding: 16px 20px;
+      border: 1px solid var(--kipu-ok-border); border-left: 4px solid var(--kipu-ok-fg); border-radius: var(--kipu-radius);
+      background: var(--kipu-ok-bg); }
+    .codigo-recuperacion p { margin: 6px 0 0; color: var(--kipu-muted); font-size: 13px; max-width: 640px; }
+    .digitos { display: block; margin-top: 4px; font: 600 32px "Space Grotesk", monospace; letter-spacing: .3em; color: var(--kipu-ink); }
     @media (max-width: 900px) { .users-grid { grid-template-columns: 1fr; } }
   `
 })
@@ -228,8 +257,28 @@ export class UsuariosComponent implements OnInit {
     gestionarUsuarios: [false]
   });
 
+  codigo = signal<CodigoRecuperacion | null>(null);
+
   ngOnInit() {
     this.cargarUsuarios();
+  }
+
+  /** Igual que el servidor: no para el administrador ni la propia cuenta; el gerente solo para cajeros. */
+  puedeGenerarCodigo(user: UsuarioFarmacia): boolean {
+    if (!this.authService.hasPermission('USUARIOS:GESTIONAR') || !user.activo) return false;
+    if (user.rol === 'ADMINISTRADOR' || user.username === this.authService.usuario()?.username) return false;
+    return this.authService.userRole() !== 'GERENTE_SUPERVISOR' || user.rol === 'EMPLEADO';
+  }
+
+  generarCodigo(user: UsuarioFarmacia) {
+    this.savingUserId.set(user.id);
+    this.authService.generarCodigoRecuperacion(user.id).subscribe({
+      next: codigo => {
+        this.codigo.set(codigo);
+        this.savingUserId.set(null);
+      },
+      error: () => this.savingUserId.set(null)
+    });
   }
 
   cargarUsuarios() {
