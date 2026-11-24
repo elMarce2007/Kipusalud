@@ -59,6 +59,7 @@ public class PersonalServiceImpl implements PersonalService {
         personal.setApellidos(dto.apellidos());
         personal.setCargo(dto.cargo());
         personal.setEmail(dto.email());
+        aplicarDatos(personal, dto);
 
         Personal personalActualizado = personalRepository.save(personal);
 
@@ -80,7 +81,47 @@ public class PersonalServiceImpl implements PersonalService {
     }
 
     private PersonalDto toDto(Personal p) {
-        return new PersonalDto(p.getId(), p.getNombres(), p.getApellidos(), p.getCargo(), p.getEmail());
+        return new PersonalDto(p.getId(), p.getNombres(), p.getApellidos(), p.getCargo(), p.getEmail(),
+                p.getDni(), p.getColegiatura(), p.getTelefono(), p.getTurno(), p.isActivo());
+    }
+
+    static final java.util.Set<String> TURNOS = java.util.Set.of("MANANA", "TARDE", "NOCHE", "ROTATIVO");
+
+    /** DNI de 8 dígitos (único en la farmacia), colegiatura, teléfono, turno y estado. */
+    private void aplicarDatos(Personal p, PersonalDto dto) {
+        String dni = limpio(dto.dni());
+        if (dni != null && !dni.matches("\\d{8}")) {
+            throw error(org.springframework.http.HttpStatus.BAD_REQUEST, "El DNI debe tener 8 dígitos");
+        }
+        if (dni != null && personalRepository.existsByFarmaciaIdAndDniAndIdNot(
+                TenantContext.requireFarmaciaId(), dni, p.getId() == null ? -1L : p.getId())) {
+            throw error(org.springframework.http.HttpStatus.CONFLICT, "Ya existe un colaborador con el DNI " + dni);
+        }
+        String colegiatura = limpio(dto.colegiatura());
+        String telefono = limpio(dto.telefono());
+        if ((colegiatura != null && colegiatura.length() > 20) || (telefono != null && telefono.length() > 20)) {
+            throw error(org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "La colegiatura y el teléfono admiten hasta 20 caracteres");
+        }
+        String turno = limpio(dto.turno());
+        if (turno != null) turno = turno.toUpperCase(java.util.Locale.ROOT);
+        if (turno != null && !TURNOS.contains(turno)) {
+            throw error(org.springframework.http.HttpStatus.BAD_REQUEST, "El turno no es válido");
+        }
+        p.setDni(dni);
+        p.setColegiatura(colegiatura);
+        p.setTelefono(telefono);
+        p.setTurno(turno);
+        p.setActivo(dto.activo() == null || dto.activo());
+    }
+
+    private static String limpio(String valor) {
+        return valor == null || valor.isBlank() ? null : valor.trim();
+    }
+
+    private static org.springframework.web.server.ResponseStatusException error(
+            org.springframework.http.HttpStatus status, String mensaje) {
+        return new org.springframework.web.server.ResponseStatusException(status, mensaje);
     }
 
     private Personal toEntity(PersonalDto dto) {
@@ -89,6 +130,7 @@ public class PersonalServiceImpl implements PersonalService {
         p.setApellidos(dto.apellidos());
         p.setCargo(dto.cargo());
         p.setEmail(dto.email());
+        aplicarDatos(p, dto);
         return p;
     }
 }

@@ -11,6 +11,13 @@ public record ProductoDto(
         Long categoriaId,
         String afectacionIgv,
         Boolean precioIncluyeIgv,
-        Integer stockMinimo
+        Integer stockMinimo,
+        /** Ficha del medicamento (todo opcional). */
+        String principioActivo,
+        String laboratorio,
+        String presentacion,
+        String registroSanitario,
+        String codigoBarras,
+        String ubicacion
 ) {
 }

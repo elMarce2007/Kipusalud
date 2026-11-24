@@ -11,5 +11,6 @@ public record LoteInventarioDto(
         Integer cantidadInicial,
         Integer cantidadDisponible,
         boolean verificado,
-        LocalDateTime creadoEn
+        LocalDateTime creadoEn,
+        java.math.BigDecimal costoUnitario
 ) {}

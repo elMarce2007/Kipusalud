@@ -4,11 +4,13 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { CategoriaService } from '../../../../services/categoria.service';
+import { CONDICIONES_VENTA, CondicionVenta } from '../../../../models/categoria.model';
 
 @Component({
   selector: 'app-categoria-form',
@@ -18,6 +20,7 @@ import { CategoriaService } from '../../../../services/categoria.service';
     MatCardModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
     MatButtonModule,
     MatIconModule
   ],
@@ -25,7 +28,7 @@ import { CategoriaService } from '../../../../services/categoria.service';
     <div class="form-container">
       <mat-card>
         <mat-card-header>
-          <mat-card-title>{{ id() ? 'Editar' : 'Nueva' }} Categoria</mat-card-title>
+          <mat-card-title>{{ id() ? 'Editar' : 'Nueva' }} categoría</mat-card-title>
         </mat-card-header>
 
         <mat-card-content>
@@ -39,8 +42,28 @@ import { CategoriaService } from '../../../../services/categoria.service';
                 }
               </mat-form-field>
 
+              <mat-form-field appearance="outline">
+                <mat-label>Condición de venta</mat-label>
+                <mat-select formControlName="condicionVenta">
+                  @for (c of condiciones; track c.valor) {
+                    <mat-option [value]="c.valor">{{ c.etiqueta }}</mat-option>
+                  }
+                </mat-select>
+                <mat-hint>Se muestra en el punto de venta al dispensar</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Código ATC</mat-label>
+                <input matInput formControlName="codigoAtc" maxlength="10" placeholder="N02BE"
+                       style="text-transform: uppercase">
+                <mat-hint>Clasificación anatómica, terapéutica y química (opcional)</mat-hint>
+                @if (form.controls.codigoAtc.hasError('pattern')) {
+                  <mat-error>Solo letras, números y guiones</mat-error>
+                }
+              </mat-form-field>
+
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Descripcion</mat-label>
+                <mat-label>Descripción</mat-label>
                 <textarea matInput formControlName="descripcion" rows="3"></textarea>
               </mat-form-field>
             </div>
@@ -70,8 +93,11 @@ export class CategoriaFormComponent implements OnInit {
 
   form = this.fb.nonNullable.group({
     nombre: ['', Validators.required],
-    descripcion: ['']
+    descripcion: [''],
+    codigoAtc: ['', [Validators.maxLength(10), Validators.pattern(/^[A-Za-z0-9-]*$/)]],
+    condicionVenta: this.fb.nonNullable.control<CondicionVenta>('VENTA_LIBRE')
   });
+  readonly condiciones = CONDICIONES_VENTA;
 
   ngOnInit() {
     if (this.id()) {
@@ -81,7 +107,12 @@ export class CategoriaFormComponent implements OnInit {
 
   cargarCategoria() {
     this.categoriaService.obtener(+this.id()!).subscribe(categoria => {
-      this.form.patchValue(categoria);
+      this.form.patchValue({
+        nombre: categoria.nombre,
+        descripcion: categoria.descripcion ?? '',
+        codigoAtc: categoria.codigoAtc ?? '',
+        condicionVenta: categoria.condicionVenta ?? 'VENTA_LIBRE'
+      });
     });
   }
 
@@ -89,7 +120,8 @@ export class CategoriaFormComponent implements OnInit {
     if (this.form.invalid) return;
 
     this.loading.set(true);
-    const categoria = this.form.getRawValue();
+    const valor = this.form.getRawValue();
+    const categoria = { ...valor, codigoAtc: valor.codigoAtc.trim().toUpperCase() || null };
 
     const operacion = this.id()
       ? this.categoriaService.actualizar(+this.id()!, categoria)
@@ -98,7 +130,7 @@ export class CategoriaFormComponent implements OnInit {
     operacion.subscribe({
       next: () => {
         this.snackBar.open(
-          `Categoria ${this.id() ? 'actualizada' : 'creada'} exitosamente`,
+          `Categoría ${this.id() ? 'actualizada' : 'creada'} exitosamente`,
           'OK',
           { duration: 3000 }
         );

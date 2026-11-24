@@ -12,7 +12,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { CategoriaService } from '../../../../services/categoria.service';
-import { Categoria } from '../../../../models/categoria.model';
+import { Categoria, condicionDeVenta } from '../../../../models/categoria.model';
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 
@@ -51,7 +51,7 @@ import { PageHeaderComponent } from '../../../../shared/components/page-header/p
         <mat-card-content>
           <mat-form-field appearance="outline" class="filter-field">
             <mat-label>Buscar</mat-label>
-            <input matInput (keyup)="applyFilter($event)" placeholder="Buscar categoria...">
+            <input matInput (keyup)="applyFilter($event)" placeholder="Nombre, descripción o código ATC…">
             <mat-icon matPrefix>search</mat-icon>
           </mat-form-field>
 
@@ -67,8 +67,20 @@ import { PageHeaderComponent } from '../../../../shared/components/page-header/p
             </ng-container>
 
             <ng-container matColumnDef="descripcion">
-              <th mat-header-cell *matHeaderCellDef>Descripcion</th>
+              <th mat-header-cell *matHeaderCellDef>Descripción</th>
               <td mat-cell *matCellDef="let row">{{ row.descripcion }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="codigoAtc">
+              <th mat-header-cell *matHeaderCellDef>Código ATC</th>
+              <td mat-cell *matCellDef="let row"><span class="mono">{{ row.codigoAtc || '—' }}</span></td>
+            </ng-container>
+
+            <ng-container matColumnDef="condicionVenta">
+              <th mat-header-cell *matHeaderCellDef>Condición de venta</th>
+              <td mat-cell *matCellDef="let row">
+                <span class="chip" [class]="condicion(row).tono">{{ condicion(row).etiqueta }}</span>
+              </td>
             </ng-container>
 
             <ng-container matColumnDef="acciones">
@@ -87,7 +99,7 @@ import { PageHeaderComponent } from '../../../../shared/components/page-header/p
             <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
 
             <tr class="mat-row" *matNoDataRow>
-              <td class="mat-cell" colspan="4" style="text-align: center; padding: 20px;">
+              <td class="mat-cell" colspan="6" style="text-align: center; padding: 20px;">
                 No se encontraron resultados
               </td>
             </tr>
@@ -109,7 +121,8 @@ export class CategoriaListComponent implements OnInit, AfterViewInit {
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
 
-  displayedColumns = ['id', 'nombre', 'descripcion', 'acciones'];
+  displayedColumns = ['id', 'nombre', 'codigoAtc', 'condicionVenta', 'descripcion', 'acciones'];
+  condicion = (c: Categoria) => condicionDeVenta(c.condicionVenta);
   dataSource = new MatTableDataSource<Categoria>();
 
   ngOnInit() {

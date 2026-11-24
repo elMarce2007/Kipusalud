@@ -49,6 +49,6 @@ class ProductoServiceImplTest {
 
     private ProductoDto producto(Integer stock) {
         return new ProductoDto(null, "Medicamento de prueba", "", BigDecimal.ONE,
-                stock, 1L, null, null, 0);
+                stock, 1L, null, null, 0, null, null, null, null, null, null);
     }
 }

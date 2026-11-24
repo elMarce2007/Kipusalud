@@ -47,12 +47,13 @@ public class ReporteController {
         Files.createDirectories(ruta.getParent());
 
         try (BufferedWriter bw = Files.newBufferedWriter(ruta, StandardCharsets.UTF_8)) {
-            bw.write("id,nombres,apellidos,cargo,email");
+            bw.write("id,nombres,apellidos,cargo,email,dni,colegiatura,telefono,turno,estado");
             bw.newLine();
 
             for (Personal p : lista) {
-                bw.write(p.getId() + "," + p.getNombres() + "," + p.getApellidos()
-                        + "," + p.getCargo() + "," + p.getEmail());
+                bw.write(String.join(",", String.valueOf(p.getId()), celda(p.getNombres()), celda(p.getApellidos()),
+                        celda(p.getCargo()), celda(p.getEmail()), celda(p.getDni()), celda(p.getColegiatura()),
+                        celda(p.getTelefono()), celda(p.getTurno()), p.isActivo() ? "ACTIVO" : "INACTIVO"));
                 bw.newLine();
             }
         }
@@ -104,5 +105,14 @@ public class ReporteController {
         List<String> lineas = Files.readAllLines(ruta, StandardCharsets.UTF_8);
         String contenido = String.join("\n", lineas);
         return ResponseEntity.ok(contenido);
+    }
+
+    /** Celda CSV: vacía si no hay dato, entre comillas si contiene comas o comillas. */
+    private static String celda(String valor) {
+        if (valor == null) return "";
+        String texto = valor.startsWith("=") || valor.startsWith("+") || valor.startsWith("-") || valor.startsWith("@")
+                ? "'" + valor : valor;
+        return texto.contains(",") || texto.contains("\"") || texto.contains("\n")
+                ? "\"" + texto.replace("\"", "\"\"") + "\"" : texto;
     }
 }

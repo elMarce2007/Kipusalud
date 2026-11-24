@@ -94,7 +94,9 @@ public class ProductoServiceImpl implements ProductoService {
 
         ProductoDto creado = crear(new ProductoDto(
                 null, datos.nombre(), datos.descripcion(), datos.precio(), 0, datos.categoriaId(),
-                datos.afectacionIgv(), datos.precioIncluyeIgv(), datos.stockMinimo()));
+                datos.afectacionIgv(), datos.precioIncluyeIgv(), datos.stockMinimo(),
+                datos.principioActivo(), datos.laboratorio(), datos.presentacion(), datos.registroSanitario(),
+                datos.codigoBarras(), datos.ubicacion()));
         AltaProductoRequest.IngresoInicial ingreso = request.ingresoInicial();
         if (ingreso == null) {
             return creado;
@@ -104,7 +106,8 @@ public class ProductoServiceImpl implements ProductoService {
                 java.util.UUID.randomUUID().toString(),
                 ingreso.referenciaDocumento(),
                 List.of(new IngresoMercaderiaRequest.LineaIngresoRequest(
-                        creado.id(), ingreso.codigoLote(), ingreso.fechaVencimiento(), ingreso.cantidad()))));
+                        creado.id(), ingreso.codigoLote(), ingreso.fechaVencimiento(), ingreso.cantidad(),
+                        ingreso.costoUnitario()))));
         return obtener(creado.id());
     }
 
@@ -122,6 +125,7 @@ public class ProductoServiceImpl implements ProductoService {
         producto.setNombre(dto.nombre());
         producto.setDescripcion(dto.descripcion());
         producto.setPrecio(dto.precio());
+        aplicarFicha(producto, dto);
         if (dto.stockMinimo() != null) {
             validarStockMinimo(dto.stockMinimo());
             producto.setStockMinimo(dto.stockMinimo());
@@ -172,7 +176,9 @@ public class ProductoServiceImpl implements ProductoService {
     private ProductoDto toDto(Producto p) {
         Long categoriaId = p.getCategoria() != null ? p.getCategoria().getId() : null;
         return new ProductoDto(p.getId(), p.getNombre(), p.getDescripcion(), p.getPrecio(), p.getStock(),
-                categoriaId, p.getAfectacionIgv(), p.getPrecioIncluyeIgv(), p.getStockMinimo());
+                categoriaId, p.getAfectacionIgv(), p.getPrecioIncluyeIgv(), p.getStockMinimo(),
+                p.getPrincipioActivo(), p.getLaboratorio(), p.getPresentacion(), p.getRegistroSanitario(),
+                p.getCodigoBarras(), p.getUbicacion());
     }
 
     private Producto toEntity(ProductoDto dto) {
@@ -188,6 +194,7 @@ public class ProductoServiceImpl implements ProductoService {
         p.setAfectacionIgv(dto.afectacionIgv());
         p.setPrecioIncluyeIgv(dto.precioIncluyeIgv());
         p.setFarmaciaId(TenantContext.requireFarmaciaId());
+        aplicarFicha(p, dto);
         if (dto.categoriaId() != null) {
             Categoria categoria = categoriaRepository.findByIdAndFarmaciaId(
                             dto.categoriaId(), TenantContext.requireFarmaciaId())
@@ -195,6 +202,42 @@ public class ProductoServiceImpl implements ProductoService {
             p.setCategoria(categoria);
         }
         return p;
+    }
+
+    /**
+     * Ficha del medicamento: textos opcionales, recortados; el código de barras no puede
+     * repetirse dentro de la farmacia.
+     */
+    private void aplicarFicha(Producto p, ProductoDto dto) {
+        p.setPrincipioActivo(texto(dto.principioActivo(), 150, "El principio activo"));
+        p.setLaboratorio(texto(dto.laboratorio(), 100, "El laboratorio"));
+        p.setPresentacion(texto(dto.presentacion(), 100, "La presentación"));
+        p.setRegistroSanitario(texto(dto.registroSanitario(), 30, "El registro sanitario"));
+        p.setUbicacion(texto(dto.ubicacion(), 50, "La ubicación"));
+        String codigo = texto(dto.codigoBarras(), 20, "El código de barras");
+        if (codigo != null && !codigo.matches("[0-9A-Za-z-]+")) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "El código de barras solo admite números, letras y guiones");
+        }
+        if (codigo != null && productoRepository.existsByFarmaciaIdAndCodigoBarrasAndIdNot(
+                TenantContext.requireFarmaciaId(), codigo, p.getId() == null ? -1L : p.getId())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT,
+                    "Ya existe otro producto con el código de barras " + codigo);
+        }
+        p.setCodigoBarras(codigo);
+    }
+
+    private String texto(String valor, int maximo, String campo) {
+        if (valor == null || valor.isBlank()) return null;
+        String limpio = valor.trim();
+        if (limpio.length() > maximo) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    campo + " no puede superar " + maximo + " caracteres");
+        }
+        return limpio;
     }
 
     private void validarConfiguracionTributaria(String afectacionIgv, Boolean precioIncluyeIgv) {

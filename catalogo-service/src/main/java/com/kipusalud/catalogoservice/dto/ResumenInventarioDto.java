@@ -13,7 +13,11 @@ public record ResumenInventarioDto(
         int lotesVigentes,
         int unidadesVencidas,
         int lotesPorVencer,
-        LoteFefo loteFefo
+        LoteFefo loteFefo,
+        /** Suma de unidades disponibles por su costo de lote (solo lotes con costo). */
+        java.math.BigDecimal valorInventario,
+        /** Unidades disponibles en lotes sin costo registrado. */
+        int unidadesSinCosto
 ) {
     public record LoteFefo(Long loteId, String codigoLote, LocalDate fechaVencimiento, Integer cantidadDisponible) {}
 }

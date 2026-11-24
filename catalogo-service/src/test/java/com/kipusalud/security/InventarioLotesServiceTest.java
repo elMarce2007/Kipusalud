@@ -82,6 +82,20 @@ class InventarioLotesServiceTest {
     }
 
     @Test
+    void resumenValorizaSoloLosLotesConCosto() {
+        when(productos.findAllByFarmaciaIdOrderByNombreAsc(FARMACIA)).thenReturn(List.of(producto(30, 10)));
+        LoteInventario conCosto = lote(1L, "L-COSTO", HOY.plusDays(300), 10);
+        conCosto.setCostoUnitario(new java.math.BigDecimal("1.255"));
+        when(lotes.findAllByFarmaciaIdAndCantidadDisponibleGreaterThan(FARMACIA, 0)).thenReturn(List.of(
+                conCosto, lote(2L, "L-SIN", HOY.plusDays(100), 4)));
+
+        ResumenInventarioDto resumen = service.resumen(60).get(0);
+
+        assertEquals(new java.math.BigDecimal("12.55"), resumen.valorInventario());
+        assertEquals(4, resumen.unidadesSinCosto());
+    }
+
+    @Test
     void vistaPreviaFefoReparteEntreLotesSinDescontarNada() {
         when(productos.existsByIdAndFarmaciaId(7L, FARMACIA)).thenReturn(true);
         when(lotes.findSellableLots(eq(FARMACIA), eq(7L), any())).thenReturn(List.of(

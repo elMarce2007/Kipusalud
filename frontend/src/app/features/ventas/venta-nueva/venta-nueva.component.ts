@@ -14,7 +14,9 @@ import { VentaService } from '../../../services/venta.service';
 import { FacturacionService } from '../../../services/facturacion.service';
 import { AuthService } from '../../../services/auth.service';
 import { Cliente, clienteFacturable } from '../../../models/cliente.model';
-import { Producto } from '../../../models/producto.model';
+import { Producto, coincideProducto, resumenFicha } from '../../../models/producto.model';
+import { CategoriaService } from '../../../services/categoria.service';
+import { condicionDeVenta } from '../../../models/categoria.model';
 import { DetalleVenta, MetodoPago, TIPOS_COMPROBANTE, TipoComprobante, Venta, clienteDeVenta } from '../../../models/venta.model';
 import { OpcionesComprobante } from '../../../models/facturacion.model';
 import { createIdempotencyKey } from '../../../core/utils/idempotency-key';
@@ -28,6 +30,7 @@ export { clienteFacturable } from '../../../models/cliente.model';
 /** Línea del despacho con los datos del producto necesarios para calcular el IGV. */
 interface LineaDespacho extends DetalleVenta {
   descripcion?: string;
+  categoriaId?: number;
   stock: number;
 }
 
@@ -95,7 +98,7 @@ export function montosRapidos(total: number): number[] {
             <label class="buscador">
               <mat-icon>search</mat-icon>
               <input #buscador type="search" autocomplete="off" aria-label="Buscar medicamento"
-                     placeholder="Escribe el nombre del medicamento o su descripción…"
+                     placeholder="Nombre, principio activo o escanea el código de barras…"
                      [value]="busqueda()" (input)="busqueda.set($any($event.target).value)"
                      (keydown.enter)="agregarPrimerResultado($event)">
               <kbd>F2</kbd>
@@ -105,7 +108,13 @@ export function montosRapidos(total: number): number[] {
                 @for (p of resultados(); track p.id) {
                   <li>
                     <button type="button" (click)="agregar(p)" [disabled]="p.stock <= 0">
-                      <span><strong>{{ p.nombre }}</strong><small>{{ p.descripcion }}</small></span>
+                      <span>
+                        <strong>{{ p.nombre }}</strong>
+                        <small>{{ ficha(p) || p.descripcion }}</small>
+                        @if (condicionDe(p.categoriaId); as c) {
+                          @if (c.valor !== 'VENTA_LIBRE') { <span class="chip receta" [class]="c.tono">{{ c.etiqueta }}</span> }
+                        }
+                      </span>
                       <span class="num">{{ p.precio | currency:'PEN':'S/ ' }}</span>
                       <span class="chip" [class.ok]="p.stock > 0" [class.danger]="p.stock <= 0">{{ p.stock }} disp.</span>
                     </button>
@@ -152,7 +161,11 @@ export function montosRapidos(total: number): number[] {
                 <tbody>
                   @for (d of detalles(); track d.productoId; let i = $index) {
                     <tr>
-                      <td><strong>{{ d.productoNombre }}</strong>@if (d.descripcion) { <small>{{ d.descripcion }}</small> }</td>
+                      <td><strong>{{ d.productoNombre }}</strong>@if (d.descripcion) { <small>{{ d.descripcion }}</small> }
+                        @if (condicionDe(d.categoriaId); as c) {
+                          @if (c.valor !== 'VENTA_LIBRE') { <span class="chip receta" [class]="c.tono">{{ c.etiqueta }}</span> }
+                        }
+                      </td>
                       <td class="fefo">
                         @if (fefo()[d.productoId]; as asignacion) {
                           @for (l of asignacion.lotes; track l.loteId) {
@@ -363,6 +376,7 @@ export function montosRapidos(total: number): number[] {
       padding: 10px 12px; border: 0; background: #fff; text-align: left; cursor: pointer; }
     .resultados button:hover:not(:disabled) { background: #fdfbf7; }
     .resultados button:disabled { opacity: .55; cursor: not-allowed; }
+    .chip.receta { margin-top: 4px; height: 20px; font-size: 11px; }
     .resultados small, .tabla-despacho small, .rapido small { display: block; color: var(--kipu-soft); font-size: 12px; }
     .vacio { padding: 14px; color: var(--kipu-soft); text-align: center; }
     .rapidos-cabecera { display: flex; justify-content: space-between; margin: 16px 0 8px; }
@@ -458,6 +472,9 @@ export class VentaNuevaComponent implements OnInit {
   private facturacionService = inject(FacturacionService);
   private authService = inject(AuthService);
   private inventarioService = inject(InventarioService);
+  private categoriaService = inject(CategoriaService);
+  /** Condición de venta por categoría (venta libre, receta, receta retenida). */
+  private condiciones = signal<Map<number, string>>(new Map());
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private snackBar = inject(MatSnackBar);
@@ -502,9 +519,9 @@ export class VentaNuevaComponent implements OnInit {
 
   resultados = computed(() => {
     const texto = this.busqueda().trim().toLowerCase();
-    return texto ? this.productos()
-      .filter(p => `${p.nombre} ${p.descripcion ?? ''}`.toLowerCase().includes(texto))
-      .slice(0, 8) : [];
+    if (!texto) return [];
+    const exacto = this.productos().find(p => p.codigoBarras?.toLowerCase() === texto);
+    return exacto ? [exacto] : this.productos().filter(p => coincideProducto(p, texto)).slice(0, 8);
   });
 
   /** Los seis productos con stock más vendidos en las ventas cargadas (o los primeros con stock). */
@@ -601,6 +618,11 @@ export class VentaNuevaComponent implements OnInit {
         this.loadError.set('No se pudieron cargar los datos de clientes. No se puede registrar una venta.');
       }
     });
+    this.categoriaService.listar().subscribe({
+      next: categorias => this.condiciones.set(new Map(categorias.filter(c => c.id != null)
+        .map(c => [c.id!, c.condicionVenta ?? 'VENTA_LIBRE']))),
+      error: err => console.error('No se pudieron cargar las condiciones de venta.', err)
+    });
     this.productoService.listar().subscribe({
       next: data => this.productos.set(data),
       error: err => {
@@ -613,6 +635,13 @@ export class VentaNuevaComponent implements OnInit {
       next: ventas => this.ventasRecientes.set(ventas.slice(0, 200)),
       error: err => console.error('No se pudieron cargar las ventas recientes.', err)
     });
+  }
+
+  ficha = (p: Producto) => resumenFicha(p, true);
+
+  condicionDe(categoriaId: number | null | undefined) {
+    const valor = categoriaId == null ? undefined : this.condiciones().get(categoriaId);
+    return valor ? condicionDeVenta(valor) : null;
   }
 
   agregarPrimerResultado(event: Event) {
@@ -630,7 +659,8 @@ export class VentaNuevaComponent implements OnInit {
       this.detalles.update(arr => [...arr, {
         productoId: producto.id!,
         productoNombre: producto.nombre,
-        descripcion: producto.descripcion,
+        descripcion: resumenFicha(producto) || producto.descripcion,
+        categoriaId: producto.categoriaId,
         cantidad: 1,
         precioUnitario: producto.precio,
         subtotal: importeLinea(producto.precio, 1, producto.afectacionIgv, producto.precioIncluyeIgv),

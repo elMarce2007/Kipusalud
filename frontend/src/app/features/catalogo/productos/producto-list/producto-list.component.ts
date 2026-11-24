@@ -12,7 +12,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 
 import { ProductoService } from '../../../../services/producto.service';
-import { Producto } from '../../../../models/producto.model';
+import { Producto, coincideProducto, resumenFicha } from '../../../../models/producto.model';
 import { CategoriaService } from '../../../../services/categoria.service';
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { Categoria } from '../../../../models/categoria.model';
@@ -87,7 +87,7 @@ import { LineaVidaLoteComponent } from '../../../../shared/components/linea-vida
       <div class="filter-bar" role="search">
         <label class="search">
           <mat-icon>search</mat-icon>
-          <input type="search" placeholder="Buscar por nombre o descripción…" aria-label="Buscar producto"
+          <input type="search" placeholder="Nombre, principio activo, laboratorio o código de barras…" aria-label="Buscar producto"
                  [value]="texto()" (input)="texto.set($any($event.target).value)">
         </label>
         <select aria-label="Categoría" [value]="categoria()" (change)="categoria.set($any($event.target).value)">
@@ -116,7 +116,10 @@ import { LineaVidaLoteComponent } from '../../../../shared/components/linea-vida
                     <span class="status-dot" [class]="tono(row)"></span>
                     <span>
                       <strong>{{ row.nombre }}</strong>
-                      @if (row.descripcion) { <small>{{ row.descripcion }}</small> }
+                      @if (row.principioActivo || row.presentacion) {
+                        <small>{{ ficha(row) }}</small>
+                      } @else if (row.descripcion) { <small>{{ row.descripcion }}</small> }
+                      @if (row.laboratorio) { <small class="lab">{{ row.laboratorio }}</small> }
                     </span>
                   </div>
                 </td>
@@ -198,6 +201,16 @@ import { LineaVidaLoteComponent } from '../../../../shared/components/linea-vida
           </header>
           <h2>{{ p.nombre }}</h2>
           @if (p.descripcion) { <p class="sub">{{ p.descripcion }}</p> }
+          @if (p.principioActivo || p.laboratorio || p.presentacion || p.registroSanitario || p.codigoBarras || p.ubicacion) {
+            <dl class="ficha">
+              @if (p.principioActivo) { <dt>Principio activo</dt><dd>{{ p.principioActivo }}</dd> }
+              @if (p.presentacion) { <dt>Presentación</dt><dd>{{ p.presentacion }}</dd> }
+              @if (p.laboratorio) { <dt>Laboratorio</dt><dd>{{ p.laboratorio }}</dd> }
+              @if (p.registroSanitario) { <dt>Reg. sanitario</dt><dd class="mono">{{ p.registroSanitario }}</dd> }
+              @if (p.codigoBarras) { <dt>Código de barras</dt><dd class="mono">{{ p.codigoBarras }}</dd> }
+              @if (p.ubicacion) { <dt>Ubicación</dt><dd>{{ p.ubicacion }}</dd> }
+            </dl>
+          }
           <app-stock-meter [stock]="p.stock" [minimo]="p.stockMinimo" />
 
           <h3 class="kpi-label">Lotes con existencias</h3>
@@ -248,6 +261,10 @@ import { LineaVidaLoteComponent } from '../../../../shared/components/linea-vida
     .lotes { list-style: none; margin: 0; padding: 0; }
     .lotes li { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center;
       padding: 6px 0; border-bottom: 1px solid var(--kipu-line); font-size: 13px; }
+    .lab { color: var(--kipu-soft); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+    .ficha { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 10px 0 14px; font-size: 13px; }
+    .ficha dt { color: var(--kipu-soft); }
+    .ficha dd { margin: 0; }
     .acciones-panel { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
     @media (max-width: 1100px) { .con-panel.abierto { grid-template-columns: 1fr; } .detalle-panel { position: static; } }
   `
@@ -326,7 +343,7 @@ export class ProductoListComponent implements OnInit, AfterViewInit {
     const estado = this.estado();
     return this.productos().filter(p => {
       const e = estadoStock(p.stock, p.stockMinimo);
-      return (!texto || `${p.nombre} ${p.descripcion ?? ''}`.toLowerCase().includes(texto))
+      return coincideProducto(p, texto)
         && (!categoria || String(p.categoriaId) === categoria)
         && (!estado || (estado === 'critico' ? e === 'critico' || e === 'agotado' : e === estado));
     });
@@ -336,14 +353,18 @@ export class ProductoListComponent implements OnInit, AfterViewInit {
     effect(() => { this.dataSource.data = this.filtrados(); });
   }
 
+  ficha = (p: Producto) => resumenFicha(p);
+
   tono(p: Producto) { return tonoEstadoStock(estadoStock(p.stock, p.stockMinimo)); }
   etiquetaEstado(p: Producto) { return ETIQUETAS_ESTADO_STOCK[estadoStock(p.stock, p.stockMinimo)]; }
 
   exportar() {
-    const filas = this.filtrados().map(p => [p.nombre, p.descripcion ?? '', p.categoriaNombre ?? '',
+    const filas = this.filtrados().map(p => [p.nombre, p.principioActivo ?? '', p.presentacion ?? '',
+      p.laboratorio ?? '', p.registroSanitario ?? '', p.codigoBarras ?? '', p.categoriaNombre ?? '',
       p.precio, p.stock, p.stockMinimo ?? 0, this.etiquetaEstado(p)]);
     descargarCsv('productos-y-stock.csv',
-      ['Producto', 'Descripción', 'Categoría', 'Precio', 'Stock', 'Stock mínimo', 'Estado'], filas);
+      ['Producto', 'Principio activo', 'Presentación', 'Laboratorio', 'Registro sanitario', 'Código de barras',
+        'Categoría', 'Precio', 'Stock', 'Stock mínimo', 'Estado'], filas);
   }
 
   ngOnInit() {

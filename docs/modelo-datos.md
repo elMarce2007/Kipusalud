@@ -49,13 +49,18 @@ exactas, índices, defaults y tipos SQL se definen en las migraciones.
 
 ### Catálogo e inventario
 
-- `Categoria`: `id`, `nombre`, `descripcion`, `farmaciaId`.
+- `Categoria`: `id`, `nombre`, `descripcion`, `codigoAtc`, `condicionVenta`
+  (`VENTA_LIBRE`, `RECETA`, `RECETA_RETENIDA`), `farmaciaId` (V9).
 - `Producto`: `id`, `nombre`, `descripcion`, `precio`, `stock`, `stockMinimo`,
-  `afectacionIgv`, `precioIncluyeIgv`, relación `categoria`, `farmaciaId`.
+  `afectacionIgv`, `precioIncluyeIgv`, relación `categoria`, `farmaciaId` y
+  ficha opcional (V9): `principioActivo`, `laboratorio`, `presentacion`,
+  `registroSanitario`, `codigoBarras` (único por farmacia cuando existe) y
+  `ubicacion`.
 - `IngresoMercaderia`: `id`, farmacia, clave de idempotencia, huella de
   solicitud, documento de referencia, actor y fecha.
 - `LoteInventario`: `id`, farmacia/producto, código, fecha de vencimiento,
-  cantidades inicial/disponible, verificación y fecha de creación.
+  cantidades inicial/disponible, `costoUnitario` opcional (V9, para valorizar
+  el inventario), verificación y fecha de creación.
 - `MovimientoInventario`: `id`, farmacia/producto/lote/ingreso/salida, tipo
   (`INGRESO`, `VENTA`, `AJUSTE`), cantidad con signo, clave de idempotencia,
   actor, fecha y, en ajustes, motivo y observación.
@@ -85,7 +90,9 @@ existencias detalladas y se actualizan junto con los movimientos.
 
 ### Personal y auditoría
 
-- `Personal`: `id`, nombres, apellidos, cargo, email, `farmaciaId`.
+- `Personal`: `id`, nombres, apellidos, cargo, email, `farmaciaId` y (V3)
+  `dni` (único por farmacia cuando existe), `colegiatura` (CQFP), `telefono`,
+  `turno` (`MANANA`, `TARDE`, `NOCHE`, `ROTATIVO`) y `activo`.
 - `DomainEventLog`: ID de evento, tipo, farmacia, agregado, fecha, actor y
   payload JSONB.
 - `DomainOutboxEvent`: ID, routing key, payload, dedupe key, creación y fecha

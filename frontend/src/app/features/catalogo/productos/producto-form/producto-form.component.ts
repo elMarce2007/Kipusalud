@@ -106,10 +106,45 @@ import { AuthService } from '../../../../services/auth.service';
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Descripcion</mat-label>
+                <mat-label>Descripción</mat-label>
                 <textarea matInput formControlName="descripcion" rows="3"></textarea>
               </mat-form-field>
             </div>
+
+            <section class="initial-inventory">
+              <h2>Ficha del producto</h2>
+              <p class="form-help">Opcional. Permite buscarlo por principio activo o con el lector de código de barras.</p>
+              <div class="form-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Principio activo</mat-label>
+                  <input matInput formControlName="principioActivo" maxlength="150" placeholder="Paracetamol">
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Laboratorio</mat-label>
+                  <input matInput formControlName="laboratorio" maxlength="100">
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Presentación</mat-label>
+                  <input matInput formControlName="presentacion" maxlength="100" placeholder="Caja x 100 tabletas 500 mg">
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Registro sanitario (DIGEMID)</mat-label>
+                  <input matInput formControlName="registroSanitario" maxlength="30" placeholder="EN-01234">
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Código de barras</mat-label>
+                  <input matInput formControlName="codigoBarras" maxlength="20" inputmode="numeric">
+                  <mat-icon matSuffix>barcode_reader</mat-icon>
+                  @if (form.controls.codigoBarras.hasError('pattern')) {
+                    <mat-error>Solo números, letras y guiones</mat-error>
+                  }
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Ubicación en almacén</mat-label>
+                  <input matInput formControlName="ubicacion" maxlength="50" placeholder="Estante A-3">
+                </mat-form-field>
+              </div>
+            </section>
 
             @if (puedeConfigurarTributos) {
               <section class="initial-inventory">
@@ -183,6 +218,16 @@ import { AuthService } from '../../../../services/auth.service';
                       }
                       @if (form.controls.cantidadInicial.hasError('max') && form.controls.cantidadInicial.touched) {
                         <mat-error>La cantidad no puede superar 1,000,000</mat-error>
+                      }
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                      <mat-label>Costo unitario de compra</mat-label>
+                      <input matInput type="number" formControlName="costoUnitario" min="0" step="0.01">
+                      <span matTextPrefix>S/&nbsp;</span>
+                      <mat-hint>Opcional; sirve para valorizar el inventario</mat-hint>
+                      @if (form.controls.costoUnitario.hasError('min')) {
+                        <mat-error>El costo no puede ser negativo</mat-error>
                       }
                     </mat-form-field>
 
@@ -266,6 +311,13 @@ export class ProductoFormComponent implements OnInit {
       Validators.pattern(/^[1-9]\d*$/)
     ]],
     referenciaDocumento: ['', Validators.maxLength(120)],
+    costoUnitario: this.fb.control<number | null>(null, Validators.min(0)),
+    principioActivo: ['', Validators.maxLength(150)],
+    laboratorio: ['', Validators.maxLength(100)],
+    presentacion: ['', Validators.maxLength(100)],
+    registroSanitario: ['', Validators.maxLength(30)],
+    codigoBarras: ['', [Validators.maxLength(20), Validators.pattern(/^[0-9A-Za-z-]*$/)]],
+    ubicacion: ['', Validators.maxLength(50)],
     afectacionIgv: this.fb.nonNullable.control<AfectacionIgv | ''>(''),
     precioIncluyeIgv: [true]
   });
@@ -336,7 +388,13 @@ export class ProductoFormComponent implements OnInit {
         descripcion: producto.descripcion,
         precio: producto.precio,
         stockMinimo: producto.stockMinimo ?? 0,
-        categoriaId: producto.categoriaId
+        categoriaId: producto.categoriaId,
+        principioActivo: producto.principioActivo ?? '',
+        laboratorio: producto.laboratorio ?? '',
+        presentacion: producto.presentacion ?? '',
+        registroSanitario: producto.registroSanitario ?? '',
+        codigoBarras: producto.codigoBarras ?? '',
+        ubicacion: producto.ubicacion ?? ''
       });
     });
   }
@@ -360,6 +418,12 @@ export class ProductoFormComponent implements OnInit {
       stock: 0,
       stockMinimo: value.stockMinimo,
       categoriaId: value.categoriaId,
+      principioActivo: value.principioActivo.trim() || null,
+      laboratorio: value.laboratorio.trim() || null,
+      presentacion: value.presentacion.trim() || null,
+      registroSanitario: value.registroSanitario.trim() || null,
+      codigoBarras: value.codigoBarras.trim() || null,
+      ubicacion: value.ubicacion.trim() || null,
       ...this.datosTributarios(value.afectacionIgv, value.precioIncluyeIgv)
     };
 
@@ -371,7 +435,8 @@ export class ProductoFormComponent implements OnInit {
             referenciaDocumento: value.referenciaDocumento.trim() || null,
             codigoLote: value.codigoLote.trim(),
             fechaVencimiento: value.fechaVencimiento,
-            cantidad: value.cantidadInicial
+            cantidad: value.cantidadInicial,
+            costoUnitario: value.costoUnitario ?? null
           } : null
         });
 
@@ -391,7 +456,9 @@ export class ProductoFormComponent implements OnInit {
       error: error => {
         console.error('No se pudo guardar el producto y su inventario inicial.', error);
         this.snackBar.open(
-          'No se pudo guardar el producto. Verifica los datos e inténtalo nuevamente.',
+          error?.status === 409
+            ? 'Ya existe otro producto con ese código de barras.'
+            : 'No se pudo guardar el producto. Verifica los datos e inténtalo nuevamente.',
           'Cerrar',
           { duration: 5000 }
         );

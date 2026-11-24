@@ -10,6 +10,7 @@ public record AltaProductoRequest(
             String referenciaDocumento,
             String codigoLote,
             LocalDate fechaVencimiento,
-            Integer cantidad
+            Integer cantidad,
+            java.math.BigDecimal costoUnitario
     ) {}
 }

@@ -5,6 +5,7 @@ export interface LoteInventario {
   fechaVencimiento: string | null;
   cantidadInicial: number;
   cantidadDisponible: number;
+  costoUnitario?: number | null;
   verificado: boolean;
   creadoEn: string;
 }
@@ -14,6 +15,8 @@ export interface LineaIngresoInventario {
   codigoLote: string;
   fechaVencimiento: string;
   cantidad: number;
+  /** Costo de compra por unidad (opcional), para valorizar el inventario. */
+  costoUnitario?: number | null;
 }
 
 export interface IngresoInventarioRequest {
@@ -65,6 +68,10 @@ export interface ResumenInventario {
   lotesVigentes: number;
   unidadesVencidas: number;
   lotesPorVencer: number;
+  /** Suma de costo × unidades disponibles de los lotes con costo registrado. */
+  valorInventario: number;
+  /** Unidades disponibles en lotes sin costo registrado. */
+  unidadesSinCosto: number;
   loteFefo: {
     loteId: number;
     codigoLote: string;

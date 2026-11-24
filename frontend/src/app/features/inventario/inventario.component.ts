@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -26,6 +26,7 @@ import { ControlStockComponent } from './control-stock.component';
     ControlStockComponent,
     PageHeaderComponent,
     DatePipe,
+    CurrencyPipe,
     ReactiveFormsModule,
     MatButtonModule,
     MatCardModule,
@@ -87,6 +88,11 @@ import { ControlStockComponent } from './control-stock.component';
                       <mat-label>Cantidad recibida</mat-label>
                       <input matInput type="number" formControlName="cantidad" min="1" max="1000000">
                     </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Costo unitario (opcional)</mat-label>
+                      <input matInput type="number" formControlName="costoUnitario" min="0" step="0.01">
+                      <span matTextPrefix>S/&nbsp;</span>
+                    </mat-form-field>
                     <button mat-raised-button color="primary" type="submit" [disabled]="lineForm.invalid">
                       <mat-icon>add</mat-icon> Añadir línea
                     </button>
@@ -111,6 +117,12 @@ import { ControlStockComponent } from './control-stock.component';
                       <ng-container matColumnDef="cantidad">
                         <th mat-header-cell *matHeaderCellDef>Cantidad</th>
                         <td mat-cell *matCellDef="let row">{{ row.cantidad }}</td>
+                      </ng-container>
+                      <ng-container matColumnDef="costo">
+                        <th mat-header-cell *matHeaderCellDef>Costo unit.</th>
+                        <td mat-cell *matCellDef="let row">
+                          {{ row.costoUnitario != null ? (row.costoUnitario | currency:'PEN':'S/ ':'1.2-4') : '—' }}
+                        </td>
                       </ng-container>
                       <ng-container matColumnDef="acciones">
                         <th mat-header-cell *matHeaderCellDef>Acciones</th>
@@ -287,7 +299,7 @@ export class InventarioComponent implements OnInit {
   retryPending = signal(false);
   private pendingRequest: IngresoInventarioRequest | null = null;
 
-  readonly lineColumns = ['producto', 'lote', 'vencimiento', 'cantidad', 'acciones'];
+  readonly lineColumns = ['producto', 'lote', 'vencimiento', 'cantidad', 'costo', 'acciones'];
   readonly lotColumns = ['lote', 'vencimiento', 'disponible', 'estado'];
   readonly movementColumns = ['fecha', 'tipo', 'cantidad', 'actor'];
 
@@ -296,7 +308,8 @@ export class InventarioComponent implements OnInit {
     productoId: [0, Validators.min(1)],
     codigoLote: ['', [Validators.required, Validators.maxLength(100)]],
     fechaVencimiento: ['', Validators.required],
-    cantidad: [1, [Validators.required, Validators.min(1), Validators.max(1_000_000)]]
+    cantidad: [1, [Validators.required, Validators.min(1), Validators.max(1_000_000)]],
+    costoUnitario: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(99_999_999)])
   });
 
   ngOnInit(): void {
@@ -333,13 +346,15 @@ export class InventarioComponent implements OnInit {
       productoId,
       codigoLote: value.codigoLote.trim().toLocaleUpperCase(),
       fechaVencimiento,
-      cantidad
+      cantidad,
+      costoUnitario: value.costoUnitario == null || (value.costoUnitario as unknown) === '' ? null : Number(value.costoUnitario)
     }]);
     this.lineForm.patchValue({
       productoId: 0,
       codigoLote: '',
       fechaVencimiento: '',
-      cantidad: 1
+      cantidad: 1,
+      costoUnitario: null
     });
   }
 
