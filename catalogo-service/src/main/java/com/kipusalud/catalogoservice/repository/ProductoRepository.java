@@ -17,6 +17,8 @@ public interface ProductoRepository extends JpaRepository<Producto, Long> {
     List<Producto> findByCategoriaIdAndFarmaciaId(Long categoriaId, Long farmaciaId);
     Optional<Producto> findByIdAndFarmaciaId(Long id, Long farmaciaId);
     boolean existsByIdAndFarmaciaId(Long id, Long farmaciaId);
+
+    boolean existsByFarmaciaIdAndCodigoBarrasAndIdNot(Long farmaciaId, String codigoBarras, Long id);
     void deleteByIdAndFarmaciaId(Long id, Long farmaciaId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

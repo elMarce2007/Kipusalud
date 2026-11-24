@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -37,7 +37,7 @@ interface FilaControl {
 @Component({
   selector: 'app-control-stock',
   standalone: true,
-  imports: [DatePipe, ReactiveFormsModule, MatButtonModule, MatIconModule, KpiCardComponent, StockMeterComponent],
+  imports: [DatePipe, CurrencyPipe, ReactiveFormsModule, MatButtonModule, MatIconModule, KpiCardComponent, StockMeterComponent],
   template: `
     <section class="kpi-grid" aria-label="Resumen de existencias">
       <app-kpi-card etiqueta="Catálogo activo" [valor]="filas().length" nota="Productos registrados" icono="inventory_2" />
@@ -47,6 +47,9 @@ interface FilaControl {
                     icono="event_busy" [tono]="conteo().porVencer ? 'warn' : 'ok'" />
       <app-kpi-card etiqueta="Unidades vencidas" [valor]="conteo().vencidas" nota="Retirar con un ajuste"
                     icono="delete_sweep" [tono]="conteo().vencidas ? 'danger' : 'ok'" />
+      <app-kpi-card etiqueta="Valor del inventario" [valor]="(conteo().valor | currency:'PEN':'S/ ') ?? ''"
+                    [nota]="conteo().sinCosto ? conteo().sinCosto + ' un. sin costo registrado' : 'A costo de compra por lote'"
+                    icono="account_balance_wallet" [tono]="conteo().sinCosto ? 'warn' : 'primary'" />
     </section>
 
     <div class="filter-bar" role="search">
@@ -207,7 +210,9 @@ export class ControlStockComponent implements OnInit {
     return {
       bajo: filas.filter(f => ['critico', 'agotado'].includes(estadoStock(f.producto.stock, f.producto.stockMinimo))).length,
       porVencer: filas.reduce((s, f) => s + (f.resumen?.lotesPorVencer ?? 0), 0),
-      vencidas: filas.reduce((s, f) => s + (f.resumen?.unidadesVencidas ?? 0), 0)
+      vencidas: filas.reduce((s, f) => s + (f.resumen?.unidadesVencidas ?? 0), 0),
+      valor: filas.reduce((s, f) => s + Number(f.resumen?.valorInventario ?? 0), 0),
+      sinCosto: filas.reduce((s, f) => s + (f.resumen?.unidadesSinCosto ?? 0), 0)
     };
   });
 

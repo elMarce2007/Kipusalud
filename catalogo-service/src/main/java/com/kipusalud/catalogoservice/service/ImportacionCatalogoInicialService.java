@@ -124,7 +124,7 @@ public class ImportacionCatalogoInicialService {
             ProductoDto creado = productoService.crear(new ProductoDto(
                     null, producto.nombre, producto.descripcion, producto.precio,
                     0, categorias.get(clave(producto.categoria)).getId(),
-                    null, null, producto.stockMinimo));
+                    null, null, producto.stockMinimo, null, null, null, null, null, null));
             productoIds.put(entry.getKey(), creado.id());
         }
 
@@ -133,7 +133,7 @@ public class ImportacionCatalogoInicialService {
             Long productoId = productoIds.get(entry.getKey());
             for (FilaImportacion lote : entry.getValue().lotes) {
                 lotes.add(new IngresoMercaderiaRequest.LineaIngresoRequest(
-                        productoId, lote.codigoLote, lote.fechaVencimiento, lote.cantidad));
+                        productoId, lote.codigoLote, lote.fechaVencimiento, lote.cantidad, null));
             }
         }
         inventarioService.registrarIngreso(new IngresoMercaderiaRequest(

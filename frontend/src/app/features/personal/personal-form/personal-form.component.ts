@@ -4,11 +4,13 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { PersonalService } from '../../../services/personal.service';
+import { Personal, TURNOS, Turno } from '../../../models/personal.model';
 
 @Component({
   selector: 'app-personal-form',
@@ -18,6 +20,7 @@ import { PersonalService } from '../../../services/personal.service';
     MatCardModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
     MatButtonModule,
     MatIconModule
   ],
@@ -25,7 +28,7 @@ import { PersonalService } from '../../../services/personal.service';
     <div class="form-container">
       <mat-card>
         <mat-card-header>
-          <mat-card-title>{{ id() ? 'Editar' : 'Nuevo' }} Personal</mat-card-title>
+          <mat-card-title>{{ id() ? 'Editar' : 'Nuevo' }} colaborador</mat-card-title>
         </mat-card-header>
 
         <mat-card-content>
@@ -62,9 +65,43 @@ import { PersonalService } from '../../../services/personal.service';
                   <mat-error>Email es requerido</mat-error>
                 }
                 @if (form.get('email')?.hasError('email') && form.get('email')?.touched) {
-                  <mat-error>Email no valido</mat-error>
+                  <mat-error>Email no válido</mat-error>
                 }
               </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>DNI</mat-label>
+                <input matInput formControlName="dni" maxlength="8" inputmode="numeric">
+                @if (form.controls.dni.hasError('pattern')) {
+                  <mat-error>El DNI tiene 8 dígitos</mat-error>
+                }
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Teléfono</mat-label>
+                <input matInput formControlName="telefono" maxlength="20" inputmode="tel">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>N.° de colegiatura (CQFP)</mat-label>
+                <input matInput formControlName="colegiatura" maxlength="20">
+                <mat-hint>Para químicos farmacéuticos (regente o asistente)</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Turno</mat-label>
+                <mat-select formControlName="turno">
+                  <mat-option [value]="null">Sin turno asignado</mat-option>
+                  @for (t of turnos; track t.valor) {
+                    <mat-option [value]="t.valor">{{ t.etiqueta }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+
+              <label class="estado">
+                <input type="checkbox" formControlName="activo">
+                Colaborador activo
+              </label>
             </div>
 
             <div class="form-actions">
@@ -79,7 +116,10 @@ import { PersonalService } from '../../../services/personal.service';
       </mat-card>
     </div>
   `,
-  styles: ``
+  styles: `
+    .estado { display: flex; align-items: center; gap: 10px; }
+    .estado input { width: 18px; height: 18px; }
+  `
 })
 export class PersonalFormComponent implements OnInit {
   private fb = inject(FormBuilder);
@@ -94,8 +134,14 @@ export class PersonalFormComponent implements OnInit {
     nombres: ['', Validators.required],
     apellidos: ['', Validators.required],
     cargo: ['', Validators.required],
-    email: ['', [Validators.required, Validators.email]]
+    email: ['', [Validators.required, Validators.email]],
+    dni: ['', Validators.pattern(/^\d{8}$/)],
+    telefono: ['', Validators.maxLength(20)],
+    colegiatura: ['', Validators.maxLength(20)],
+    turno: this.fb.control<Turno | null>(null),
+    activo: [true]
   });
+  readonly turnos = TURNOS;
 
   ngOnInit() {
     if (this.id()) {
@@ -105,7 +151,17 @@ export class PersonalFormComponent implements OnInit {
 
   cargarPersonal() {
     this.personalService.obtener(+this.id()!).subscribe(personal => {
-      this.form.patchValue(personal);
+      this.form.patchValue({
+        nombres: personal.nombres,
+        apellidos: personal.apellidos,
+        cargo: personal.cargo,
+        email: personal.email,
+        dni: personal.dni ?? '',
+        telefono: personal.telefono ?? '',
+        colegiatura: personal.colegiatura ?? '',
+        turno: personal.turno ?? null,
+        activo: personal.activo ?? true
+      });
     });
   }
 
@@ -113,7 +169,13 @@ export class PersonalFormComponent implements OnInit {
     if (this.form.invalid) return;
 
     this.loading.set(true);
-    const personal = this.form.getRawValue();
+    const v = this.form.getRawValue();
+    const personal: Personal = {
+      ...v,
+      dni: v.dni.trim() || null,
+      telefono: v.telefono.trim() || null,
+      colegiatura: v.colegiatura.trim() || null
+    };
 
     const operacion = this.id()
       ? this.personalService.actualizar(+this.id()!, personal)
@@ -128,7 +190,12 @@ export class PersonalFormComponent implements OnInit {
         );
         this.router.navigate(['/personal']);
       },
-      error: () => this.loading.set(false)
+      error: err => {
+        this.loading.set(false);
+        if (err?.status === 409) {
+          this.snackBar.open('Ya existe un colaborador con ese DNI.', 'Cerrar', { duration: 4000 });
+        }
+      }
     });
   }
 

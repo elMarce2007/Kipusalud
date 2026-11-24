@@ -43,6 +43,9 @@ public class LoteInventario {
     @Column(name = "creado_en", nullable = false)
     private LocalDateTime creadoEn;
 
+    @Column(name = "costo_unitario", precision = 12, scale = 4)
+    private java.math.BigDecimal costoUnitario;
+
     public Long getId() { return id; }
     public Long getFarmaciaId() { return farmaciaId; }
     public void setFarmaciaId(Long farmaciaId) { this.farmaciaId = farmaciaId; }
@@ -58,6 +61,8 @@ public class LoteInventario {
     public void setCantidadDisponible(Integer cantidadDisponible) { this.cantidadDisponible = cantidadDisponible; }
     public boolean isVerificado() { return verificado; }
     public void setVerificado(boolean verificado) { this.verificado = verificado; }
+    public java.math.BigDecimal getCostoUnitario() { return costoUnitario; }
+    public void setCostoUnitario(java.math.BigDecimal costoUnitario) { this.costoUnitario = costoUnitario; }
     public LocalDateTime getCreadoEn() { return creadoEn; }
     public void setCreadoEn(LocalDateTime creadoEn) { this.creadoEn = creadoEn; }
 }

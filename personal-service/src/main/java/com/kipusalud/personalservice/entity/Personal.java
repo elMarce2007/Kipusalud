@@ -25,6 +25,34 @@ public class Personal {
     @Column(name = "farmacia_id", nullable = false)
     private Long farmaciaId;
 
+    @Column(length = 8)
+    private String dni;
+
+    /** Número de colegiatura (CQFP) del químico farmacéutico. */
+    @Column(length = 20)
+    private String colegiatura;
+
+    @Column(length = 20)
+    private String telefono;
+
+    /** MANANA, TARDE, NOCHE o ROTATIVO. */
+    @Column(length = 20)
+    private String turno;
+
+    @Column(nullable = false)
+    private boolean activo = true;
+
+    public String getDni() { return dni; }
+    public void setDni(String dni) { this.dni = dni; }
+    public String getColegiatura() { return colegiatura; }
+    public void setColegiatura(String colegiatura) { this.colegiatura = colegiatura; }
+    public String getTelefono() { return telefono; }
+    public void setTelefono(String telefono) { this.telefono = telefono; }
+    public String getTurno() { return turno; }
+    public void setTurno(String turno) { this.turno = turno; }
+    public boolean isActivo() { return activo; }
+    public void setActivo(boolean activo) { this.activo = activo; }
+
     public Personal() {}
 
     public Long getId() { return id; }

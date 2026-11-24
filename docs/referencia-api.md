@@ -46,6 +46,10 @@ Controlador: `catalogo-service/.../controller/CategoriaController.java`.
 | PUT | `/api/categorias/{id}` | `CATALOGO:GESTIONAR` |
 | DELETE | `/api/categorias/{id}` | `CATALOGO:GESTIONAR`; `204` |
 
+Cada categoría lleva `codigoAtc` (opcional, `[A-Z0-9-]` hasta 10, se guarda en
+mayúsculas) y `condicionVenta` (`VENTA_LIBRE` por defecto, `RECETA`,
+`RECETA_RETENIDA`); el punto de venta muestra la condición de cada producto.
+
 ## Productos — `catalogo-service`
 
 Controlador: `catalogo-service/.../controller/ProductoController.java`.
@@ -59,6 +63,12 @@ Controlador: `catalogo-service/.../controller/ProductoController.java`.
 | PUT | `/api/productos/{id}` | `CATALOGO:GESTIONAR` |
 | DELETE | `/api/productos/{id}` | `CATALOGO:GESTIONAR`; `204` |
 
+Ficha opcional del producto: `principioActivo`, `laboratorio`, `presentacion`,
+`registroSanitario`, `codigoBarras` y `ubicacion`. `PUT` reemplaza la ficha
+completa (un campo ausente queda vacío). `codigoBarras` admite
+`[0-9A-Za-z-]` hasta 20 caracteres y es único por farmacia (`409` si se repite).
+En `POST /api/productos/alta`, `ingresoInicial.costoUnitario` es opcional.
+
 ## Inventario — `catalogo-service`
 
 Controlador: `catalogo-service/.../controller/InventarioController.java`.
@@ -70,7 +80,7 @@ Controlador: `catalogo-service/.../controller/InventarioController.java`.
 | POST | `/api/inventario/ventas/salida` | `INVENTARIO:GESTIONAR`; salida idempotente y descuento FEFO |
 | GET | `/api/inventario/productos/{productoId}/kardex` | `INVENTARIO:VER` |
 | GET | `/api/inventario/alertas?diasVencimiento=30` | `INVENTARIO:VER` |
-| GET | `/api/inventario/resumen?diasPorVencer=60` | `INVENTARIO:VER`; por producto: stock, mínimo, lote FEFO activo, lotes vigentes, lotes por vencer y unidades vencidas |
+| GET | `/api/inventario/resumen?diasPorVencer=60` | `INVENTARIO:VER`; por producto: stock, mínimo, lote FEFO activo, lotes vigentes, lotes por vencer, unidades vencidas, `valorInventario` (costo × disponible de los lotes con costo) y `unidadesSinCosto` |
 | GET | `/api/inventario/productos/{productoId}/fefo?cantidad=N` | `INVENTARIO:VER`; vista previa de los lotes que usaría una venta, sin descontar (`completa`, `faltante`) |
 | GET | `/api/inventario/ventas/{claveIdempotencia}/lotes` | `INVENTARIO:VER`; lotes de los que salió cada producto de una venta; `404` si no hay salida |
 | POST | `/api/inventario/ajustes` | `INVENTARIO:GESTIONAR` y rol administrador o QF; baja idempotente de unidades de un lote (motivos `MERMA`, `VENCIMIENTO`, `DANIO`, `CONTEO`, `DEVOLUCION_PROVEEDOR`, `OTRO` con observación); `409` si dejaría stock negativo |
@@ -127,6 +137,12 @@ Controladores: `PersonalController`, `ReporteController`.
 | GET | `/api/personal/reporte/csv` | Descarga/recrea CSV para tenant actual |
 | GET | `/api/personal/reporte/listar` | Nombres de CSV del tenant |
 | GET | `/api/personal/reporte/leer/{nombreArchivo}` | Lee archivo cuyo nombre está limitado al tenant |
+
+`PersonalDto` incluye `dni` (8 dígitos, único por farmacia; `409` si se repite),
+`colegiatura` (CQFP), `telefono`, `turno` (`MANANA`, `TARDE`, `NOCHE`,
+`ROTATIVO` o vacío) y `activo` (verdadero si se omite). El CSV agrega esas
+columnas y escapa comas, comillas y fórmulas. Las operaciones SOAP
+`registrar`/`actualizar` conservan sus parámetros y no modifican estos campos.
 
 ## SOAP personal
 

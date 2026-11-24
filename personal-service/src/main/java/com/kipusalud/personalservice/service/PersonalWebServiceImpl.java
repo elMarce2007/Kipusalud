@@ -85,6 +85,7 @@ public class PersonalWebServiceImpl implements IPersonalWebService {
     }
 
     private PersonalDto toDto(Personal p) {
-        return new PersonalDto(p.getId(), p.getNombres(), p.getApellidos(), p.getCargo(), p.getEmail());
+        return new PersonalDto(p.getId(), p.getNombres(), p.getApellidos(), p.getCargo(), p.getEmail(),
+                p.getDni(), p.getColegiatura(), p.getTelefono(), p.getTurno(), p.isActivo());
     }
 }

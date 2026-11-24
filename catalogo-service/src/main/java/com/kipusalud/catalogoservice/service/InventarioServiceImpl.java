@@ -114,6 +114,7 @@ public class InventarioServiceImpl implements InventarioService {
             lote.setCantidadDisponible(linea.cantidad());
             lote.setVerificado(true);
             lote.setCreadoEn(ingreso.getCreadoEn());
+            lote.setCostoUnitario(linea.costoUnitario());
             lote = loteRepository.save(lote);
 
             int stockAnterior = producto.getStock();
@@ -317,8 +318,15 @@ public class InventarioServiceImpl implements InventarioService {
         ResumenInventarioDto.LoteFefo fefo = vigentes.isEmpty() ? null : new ResumenInventarioDto.LoteFefo(
                 vigentes.get(0).getId(), vigentes.get(0).getCodigoLote(),
                 vigentes.get(0).getFechaVencimiento(), vigentes.get(0).getCantidadDisponible());
+        java.math.BigDecimal valor = lotes.stream()
+                .filter(l -> l.getCostoUnitario() != null)
+                .map(l -> l.getCostoUnitario().multiply(java.math.BigDecimal.valueOf(l.getCantidadDisponible())))
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+        int sinCosto = lotes.stream().filter(l -> l.getCostoUnitario() == null)
+                .mapToInt(LoteInventario::getCantidadDisponible).sum();
         return new ResumenInventarioDto(producto.getId(), producto.getStock(), producto.getStockMinimo(),
-                vigentes.size(), vencidas, porVencer, fefo);
+                vigentes.size(), vencidas, porVencer, fefo, valor, sinCosto);
     }
 
     @Override
@@ -481,7 +489,9 @@ public class InventarioServiceImpl implements InventarioService {
                     || linea.codigoLote() == null || linea.codigoLote().isBlank()
                     || linea.codigoLote().trim().length() > 100
                     || linea.fechaVencimiento() == null || linea.fechaVencimiento().isBefore(hoy)
-                    || linea.cantidad() == null || linea.cantidad() < 1 || linea.cantidad() > 1_000_000) {
+                    || linea.cantidad() == null || linea.cantidad() < 1 || linea.cantidad() > 1_000_000
+                    || (linea.costoUnitario() != null && (linea.costoUnitario().signum() < 0
+                        || linea.costoUnitario().compareTo(new java.math.BigDecimal("99999999")) > 0))) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Cada línea requiere producto, lote, vencimiento futuro y cantidad positiva");
             }
@@ -560,7 +570,9 @@ public class InventarioServiceImpl implements InventarioService {
                             request.lineas().stream()
                                     .map(linea -> new IngresoMercaderiaRequest.LineaIngresoRequest(
                                             linea.productoId(), linea.codigoLote().trim().toUpperCase(Locale.ROOT),
-                                            linea.fechaVencimiento(), linea.cantidad()))
+                                            linea.fechaVencimiento(), linea.cantidad(),
+                                            linea.costoUnitario() == null ? null
+                                                    : linea.costoUnitario().stripTrailingZeros()))
                                     .toList())));
             return HexFormat.of().formatHex(digest);
         } catch (JsonProcessingException e) {
@@ -580,7 +592,7 @@ public class InventarioServiceImpl implements InventarioService {
     private LoteInventarioDto toLoteDto(LoteInventario lote) {
         return new LoteInventarioDto(lote.getId(), lote.getProductoId(), lote.getCodigoLote(),
                 lote.getFechaVencimiento(), lote.getCantidadInicial(), lote.getCantidadDisponible(),
-                lote.isVerificado(), lote.getCreadoEn());
+                lote.isVerificado(), lote.getCreadoEn(), lote.getCostoUnitario());
     }
 
     private IngresoMercaderiaDto toIngresoDto(IngresoMercaderia ingreso, boolean repetido) {

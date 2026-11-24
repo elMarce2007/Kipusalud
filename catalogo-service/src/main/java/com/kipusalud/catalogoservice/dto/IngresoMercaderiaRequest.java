@@ -12,6 +12,8 @@ public record IngresoMercaderiaRequest(
             Long productoId,
             String codigoLote,
             LocalDate fechaVencimiento,
-            Integer cantidad
+            Integer cantidad,
+            /** Costo de compra por unidad (opcional), para valorizar el inventario. */
+            java.math.BigDecimal costoUnitario
     ) {}
 }
