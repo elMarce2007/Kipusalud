@@ -27,7 +27,7 @@ interface NavItem {
   ],
   template: `
     <div class="sidenav-header">
-      <mat-icon class="logo">local_pharmacy</mat-icon>
+      <mat-icon class="logo">hub</mat-icon>
       @if (expanded()) {
         <div class="brand-copy">
           <span class="brand-name">KipuSalud</span>
@@ -58,6 +58,10 @@ interface NavItem {
     </mat-nav-list>
 
     <div class="sidenav-footer">
+      <button mat-button (click)="authService.logout()" [matTooltip]="!expanded() ? 'Cerrar sesión' : ''">
+        <mat-icon>logout</mat-icon>
+        @if (expanded()) { <span>Cerrar sesión</span> }
+      </button>
       <button mat-button (click)="toggleExpand.emit()">
         <mat-icon>{{ expanded() ? 'chevron_left' : 'chevron_right' }}</mat-icon>
         @if (expanded()) { <span>Contraer menú</span> }

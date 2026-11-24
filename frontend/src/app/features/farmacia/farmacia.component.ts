@@ -15,11 +15,13 @@ import {
   SunatConfiguracion
 } from '../../models/facturacion.model';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
 @Component({
   selector: 'app-farmacia',
   standalone: true,
   imports: [
+    PageHeaderComponent,
     ReactiveFormsModule,
     MatButtonModule,
     MatCardModule,
@@ -30,12 +32,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
   ],
   template: `
     <div class="page-container">
-      <div class="page-header">
-        <div>
-          <p class="eyebrow">Datos de la botica</p>
-          <h1>Farmacia</h1>
-        </div>
-      </div>
+      <app-page-header titulo="Datos de la farmacia" [migas]="[{ etiqueta: 'Farmacia' }]" />
 
       <mat-card class="farmacia-card">
         <mat-card-header>

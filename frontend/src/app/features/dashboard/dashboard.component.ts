@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -15,7 +15,9 @@ import { ProductoService } from '../../services/producto.service';
 import { VentaService } from '../../services/venta.service';
 import { PersonalService } from '../../services/personal.service';
 import { AuthService } from '../../services/auth.service';
-import { StatsCardsComponent } from './widgets/stats-cards/stats-cards.component';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
+import { etiquetaRol } from '../../core/utils/roles';
 import { Venta } from '../../models/venta.model';
 import { Producto } from '../../models/producto.model';
 
@@ -27,19 +29,19 @@ import { Producto } from '../../models/producto.model';
     MatIconModule,
     MatButtonModule,
     BaseChartDirective,
-    StatsCardsComponent,
+    PageHeaderComponent,
+    KpiCardComponent,
     CurrencyPipe,
     DatePipe,
     RouterLink
   ],
   template: `
     <div class="page-container">
-      <div class="page-header">
-        <div>
-          <p class="eyebrow">Resumen de la farmacia</p>
-          <h1>Dashboard</h1>
-        </div>
-      </div>
+      <app-page-header titulo="Panel general" [descripcion]="saludo()">
+        <a mat-raised-button color="primary" routerLink="/ventas/nueva">
+          <mat-icon>point_of_sale</mat-icon> Nueva venta
+        </a>
+      </app-page-header>
 
       @if (loadError()) {
         <div class="load-error" role="alert">
@@ -49,26 +51,26 @@ import { Producto } from '../../models/producto.model';
         </div>
       }
 
-      <app-stats-cards
-        [totalClientes]="stats().clientes"
-        [totalProductos]="stats().productos"
-        [totalVentas]="stats().ventas"
-        [totalPersonal]="stats().personal"
-        [showPersonal]="hasStaffAccess()" />
+      <section class="kpi-grid" aria-label="Indicadores">
+        <app-kpi-card etiqueta="Ventas del día" [valor]="(ventasHoy().total | currency:'PEN':'S/ ')!"
+                      [nota]="ventasHoy().cantidad + (ventasHoy().cantidad === 1 ? ' comprobante' : ' comprobantes')"
+                      icono="payments" tono="primary" />
+        <app-kpi-card etiqueta="Alerta de existencias" [valor]="stockBajo().length" nota="Bajo el stock mínimo"
+                      icono="inventory" [tono]="stockBajo().length ? 'danger' : 'ok'" />
+        @if (puedeVerInventario) {
+          <app-kpi-card etiqueta="Lotes por vencer" [valor]="alertasVencimiento().length"
+                        [nota]="'Próximos ' + diasVencimiento + ' días'" icono="event_busy"
+                        [tono]="alertasVencimiento().length ? 'warn' : 'ok'" />
+        }
+        <app-kpi-card etiqueta="Clientes" [valor]="stats().clientes" nota="En el directorio" icono="groups" />
+        <app-kpi-card etiqueta="Productos" [valor]="stats().productos" [nota]="stats().ventas + ' ventas registradas'"
+                      icono="medication" />
+        @if (hasStaffAccess()) {
+          <app-kpi-card etiqueta="Personal" [valor]="stats().personal" nota="Colaboradores registrados" icono="badge" />
+        }
+      </section>
 
       <section class="atencion-grid" aria-label="Atención requerida">
-        <mat-card class="atencion-card">
-          <mat-card-header>
-            <mat-icon mat-card-avatar class="icono ventas">point_of_sale</mat-icon>
-            <mat-card-title>Ventas de hoy</mat-card-title>
-            <mat-card-subtitle>Solo ventas confirmadas</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content>
-            <p class="cifra">{{ ventasHoy().total | currency:'PEN':'S/ ' }}</p>
-            <p class="detalle">{{ ventasHoy().cantidad }} {{ ventasHoy().cantidad === 1 ? 'venta' : 'ventas' }}</p>
-          </mat-card-content>
-        </mat-card>
-
         <mat-card class="atencion-card">
           <mat-card-header>
             <mat-icon mat-card-avatar class="icono stock">inventory</mat-icon>
@@ -190,6 +192,11 @@ export class DashboardComponent implements OnInit {
   readonly puedeVerInventario = this.authService.hasPermission('INVENTARIO:VER');
   readonly diasVencimiento = 30;
   ventasHoy = signal({ total: 0, cantidad: 0 });
+  saludo = computed(() => {
+    const u = this.authService.usuario();
+    const hoy = new Date().toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' });
+    return u ? `${u.farmaciaNombre} · ${etiquetaRol(u.rol)} · ${hoy}` : hoy;
+  });
   stockBajo = signal<Producto[]>([]);
   alertasVencimiento = signal<AlertaInventario[]>([]);
   errorAlertas = signal(false);

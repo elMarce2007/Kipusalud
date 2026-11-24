@@ -4,6 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import {
   CatalogoInicialEstado,
   CatalogoInicialService
@@ -19,15 +20,10 @@ interface AdminLink {
 @Component({
   selector: 'app-administracion',
   standalone: true,
-  imports: [RouterLink, MatButtonModule, MatCardModule, MatIconModule, MatProgressSpinnerModule],
+  imports: [RouterLink, MatButtonModule, MatCardModule, MatIconModule, MatProgressSpinnerModule, PageHeaderComponent],
   template: `
     <div class="page-container">
-      <div class="page-header">
-        <div>
-          <p class="eyebrow">Configuración y operación</p>
-          <h1>Administración de la farmacia</h1>
-        </div>
-      </div>
+      <app-page-header titulo="Administración de la farmacia" [migas]="[{ etiqueta: 'Administración' }]" />
 
       <p class="intro">
         Configura el catálogo por lotes, la botica y los perfiles del equipo. Las operaciones de

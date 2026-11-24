@@ -14,11 +14,13 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { PersonalService } from '../../../services/personal.service';
 import { Personal } from '../../../models/personal.model';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 
 @Component({
   selector: 'app-personal-list',
   standalone: true,
   imports: [
+    PageHeaderComponent,
     RouterLink,
     MatTableModule,
     MatPaginatorModule,
@@ -31,20 +33,14 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
   ],
   template: `
     <div class="page-container">
-      <div class="page-header">
-        <div>
-          <p class="eyebrow">Equipo de la farmacia</p>
-          <h1>Personal</h1>
-        </div>
-        <div class="header-actions">
-          <button mat-raised-button class="btn-excel" (click)="descargarReporte()">
-            <mat-icon>description</mat-icon> Exportar
-          </button>
-          <button mat-raised-button color="primary" routerLink="nuevo">
-            <mat-icon>add</mat-icon> Nuevo Personal
-          </button>
-        </div>
-      </div>
+      <app-page-header titulo="Gestión de personal" [migas]="[{ etiqueta: 'Personal' }]">
+        <button mat-stroked-button (click)="descargarReporte()">
+          <mat-icon>download</mat-icon> Exportar
+        </button>
+        <button mat-raised-button color="primary" routerLink="nuevo">
+          <mat-icon>person_add</mat-icon> Nuevo colaborador
+        </button>
+      </app-page-header>
 
       @if (loadError()) {
         <div class="load-error" role="alert">

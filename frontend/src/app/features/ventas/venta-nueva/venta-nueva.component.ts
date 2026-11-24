@@ -1,13 +1,7 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, ElementRef, HostListener, OnInit, ViewChild, inject, signal, computed } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTableModule } from '@angular/material/table';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -16,44 +10,74 @@ import { CurrencyPipe } from '@angular/common';
 import { ClienteService } from '../../../services/cliente.service';
 import { ProductoService } from '../../../services/producto.service';
 import { VentaService } from '../../../services/venta.service';
-import { Cliente } from '../../../models/cliente.model';
-import { Producto } from '../../../models/producto.model';
-import { DetalleVenta, MetodoPago, TIPOS_COMPROBANTE, TipoComprobante } from '../../../models/venta.model';
-import { OpcionesComprobante } from '../../../models/facturacion.model';
 import { FacturacionService } from '../../../services/facturacion.service';
+import { AuthService } from '../../../services/auth.service';
+import { Cliente, clienteFacturable } from '../../../models/cliente.model';
+import { Producto } from '../../../models/producto.model';
+import { DetalleVenta, MetodoPago, TIPOS_COMPROBANTE, TipoComprobante, Venta } from '../../../models/venta.model';
+import { OpcionesComprobante } from '../../../models/facturacion.model';
 import { createIdempotencyKey } from '../../../core/utils/idempotency-key';
+import { etiquetaRol } from '../../../core/utils/roles';
+import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 
-/** Un cliente puede recibir factura si tiene RUC, razón social y dirección fiscal. */
-export function clienteFacturable(cliente: Cliente | null | undefined): boolean {
-  return !!cliente && /^\d{11}$/.test(cliente.ruc?.trim() ?? '')
-    && !!cliente.razonSocial?.trim() && !!cliente.direccionFiscal?.trim();
+export { clienteFacturable } from '../../../models/cliente.model';
+
+/** Línea del despacho con los datos del producto necesarios para calcular el IGV. */
+interface LineaDespacho extends DetalleVenta {
+  descripcion?: string;
+  stock: number;
+}
+
+export const METODOS_PAGO: { valor: MetodoPago; etiqueta: string; icono: string }[] = [
+  { valor: 'EFECTIVO', etiqueta: 'Efectivo', icono: 'payments' },
+  { valor: 'YAPE', etiqueta: 'Yape', icono: 'qr_code_2' },
+  { valor: 'PLIN', etiqueta: 'Plin', icono: 'qr_code_2' },
+  { valor: 'TARJETA', etiqueta: 'Tarjeta', icono: 'credit_card' },
+  { valor: 'TRANSFERENCIA', etiqueta: 'Transferencia', icono: 'account_balance' }
+];
+
+const IGV = 0.18;
+const redondear = (valor: number) => Math.round(valor * 100) / 100;
+
+/**
+ * Importe cobrado por una línea, igual que el backend: si el producto es gravado (10) y
+ * su precio no incluye IGV, se le suma el 18 %.
+ */
+export function importeLinea(precio: number, cantidad: number, afectacion?: string | null,
+                             precioIncluyeIgv?: boolean | null): number {
+  const base = precio * cantidad;
+  return redondear(afectacion === '10' && precioIncluyeIgv === false ? base * (1 + IGV) : base);
+}
+
+/** Montos rápidos de efectivo: exacto y los billetes siguientes que cubren el total. */
+export function montosRapidos(total: number): number[] {
+  if (total <= 0) return [];
+  const exacto = redondear(total);
+  const billetes = [10, 20, 50, 100, 200].filter(b => b > exacto).slice(0, 3);
+  return [exacto, ...billetes];
 }
 
 @Component({
   selector: 'app-venta-nueva',
   standalone: true,
   imports: [
-    ReactiveFormsModule,
     CurrencyPipe,
-    MatCardModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatSelectModule,
+    RouterLink,
     MatButtonModule,
     MatIconModule,
-    MatTableModule,
     MatCheckboxModule,
     MatRadioModule,
-    RouterLink
+    PageHeaderComponent
   ],
   template: `
-    <div class="venta-container">
-      <div class="page-header">
-        <div>
-          <p class="eyebrow">Punto de venta</p>
-          <h1>Nueva venta</h1>
+    <div class="page-container">
+      <app-page-header titulo="Ventas de mostrador y despacho" insignia="FEFO activo"
+                       [migas]="[{ etiqueta: 'Ventas', ruta: '/ventas' }, { etiqueta: 'Nueva venta' }]">
+        <div class="caja">
+          <mat-icon>point_of_sale</mat-icon>
+          <span><strong>{{ usuario() }}</strong><small>{{ rol() }}</small></span>
         </div>
-      </div>
+      </app-page-header>
 
       @if (loadError()) {
         <div class="load-error" role="alert">
@@ -61,12 +85,96 @@ export function clienteFacturable(cliente: Cliente | null | undefined): boolean 
         </div>
       }
 
-      <div class="venta-grid">
-        <mat-card class="cliente-card">
-          <mat-card-header>
-            <mat-card-title>Comprobante de pago</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
+      <div class="pos-grid">
+        <div class="pos-main">
+          <section class="panel">
+            <label class="buscador">
+              <mat-icon>search</mat-icon>
+              <input #buscador type="search" autocomplete="off" aria-label="Buscar medicamento"
+                     placeholder="Escribe el nombre del medicamento o su descripción…"
+                     [value]="busqueda()" (input)="busqueda.set($any($event.target).value)"
+                     (keydown.enter)="agregarPrimerResultado($event)">
+              <kbd>F2</kbd>
+            </label>
+            @if (busqueda().trim()) {
+              <ul class="resultados" role="listbox" aria-label="Resultados de la búsqueda">
+                @for (p of resultados(); track p.id) {
+                  <li>
+                    <button type="button" (click)="agregar(p)" [disabled]="p.stock <= 0">
+                      <span><strong>{{ p.nombre }}</strong><small>{{ p.descripcion }}</small></span>
+                      <span class="num">{{ p.precio | currency:'PEN':'S/ ' }}</span>
+                      <span class="chip" [class.ok]="p.stock > 0" [class.danger]="p.stock <= 0">{{ p.stock }} disp.</span>
+                    </button>
+                  </li>
+                } @empty {
+                  <li class="vacio">No hay productos que coincidan.</li>
+                }
+              </ul>
+            } @else if (rapidos().length) {
+              <div class="rapidos-cabecera">
+                <span class="kpi-label">Productos de alta rotación</span>
+                <span class="tiempo-real">Stock en tiempo real</span>
+              </div>
+              <div class="rapidos">
+                @for (p of rapidos(); track p.id) {
+                  <button type="button" class="rapido" (click)="agregar(p)" [disabled]="p.stock <= 0">
+                    <strong>{{ p.nombre }}</strong>
+                    <small>{{ p.descripcion }}</small>
+                    <span class="rapido-pie">
+                      <span class="precio">{{ p.precio | currency:'PEN':'S/ ' }}</span>
+                      <span class="chip" [class.ok]="p.stock > 10" [class.warn]="p.stock > 0 && p.stock <= 10"
+                            [class.danger]="p.stock <= 0">{{ p.stock }} disp.</span>
+                    </span>
+                  </button>
+                }
+              </div>
+            }
+          </section>
+
+          <section class="panel despacho">
+            <header class="despacho-cabecera">
+              <h2><mat-icon>receipt_long</mat-icon> Detalle de medicamentos en despacho</h2>
+              <span class="chip">{{ unidades() }} {{ unidades() === 1 ? 'unidad' : 'unidades' }}</span>
+              <span class="spacer"></span>
+              @if (detalles().length) {
+                <button mat-button type="button" (click)="vaciar()"><mat-icon>remove_shopping_cart</mat-icon> Vaciar</button>
+              }
+            </header>
+            <div class="table-wrap">
+              <table class="tabla-despacho">
+                <thead>
+                  <tr><th>Fármaco y presentación</th><th>Cant.</th><th class="num">P. unit</th><th class="num">Subtotal</th><th></th></tr>
+                </thead>
+                <tbody>
+                  @for (d of detalles(); track d.productoId; let i = $index) {
+                    <tr>
+                      <td><strong>{{ d.productoNombre }}</strong>@if (d.descripcion) { <small>{{ d.descripcion }}</small> }</td>
+                      <td>
+                        <div class="stepper">
+                          <button type="button" aria-label="Quitar una unidad" (click)="cambiarCantidad(i, -1)">−</button>
+                          <span class="num">{{ d.cantidad }}</span>
+                          <button type="button" aria-label="Agregar una unidad" (click)="cambiarCantidad(i, 1)"
+                                  [disabled]="d.cantidad >= d.stock">+</button>
+                        </div>
+                      </td>
+                      <td class="num">{{ d.precioUnitario | currency:'PEN':'S/ ' }}</td>
+                      <td class="num"><strong>{{ d.subtotal | currency:'PEN':'S/ ' }}</strong></td>
+                      <td><button mat-icon-button type="button" aria-label="Eliminar fila" (click)="eliminarDetalle(i)"><mat-icon>close</mat-icon></button></td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="5" class="vacio">Busca un medicamento o toca un producto de alta rotación para agregarlo.</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <footer class="atajos"><span><kbd>F2</kbd> Buscar</span><span><kbd>F10</kbd> Registrar venta</span>
+              <span>El lote se asigna por FEFO al confirmar.</span></footer>
+          </section>
+        </div>
+
+        <aside class="pos-lateral">
+          <section class="panel">
+            <h3 class="kpi-label">Comprobante de pago</h3>
             <mat-radio-group class="tipos-comprobante" aria-label="Tipo de comprobante"
                              [value]="tipoComprobante()" (change)="cambiarTipoComprobante($event.value)">
               <mat-radio-button value="BOLETA_INTERNA">
@@ -86,195 +194,219 @@ export function clienteFacturable(cliente: Cliente | null | undefined): boolean 
               <p class="nota" role="note">{{ opciones()!.motivoNoDisponible }}</p>
             }
 
+            <h3 class="kpi-label">Datos del adquiriente</h3>
             @if (tipoComprobante() === 'FACTURA') {
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Buscar empresa por razón social o RUC</mat-label>
-                <input matInput [value]="busquedaEmpresa()" (input)="buscarEmpresa($event)" autocomplete="off">
-                <mat-icon matSuffix>search</mat-icon>
-              </mat-form-field>
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Empresa</mat-label>
-                <mat-select [value]="clienteSeleccionado()" (selectionChange)="seleccionarCliente($event.value)">
-                  @for (empresa of empresasFiltradas(); track empresa.id) {
-                    <mat-option [value]="empresa">{{ empresa.razonSocial }} · RUC {{ empresa.ruc }}</mat-option>
-                  } @empty {
-                    <mat-option disabled>No hay empresas que coincidan</mat-option>
+              <label class="campo">
+                <span>Buscar empresa por razón social o RUC</span>
+                <input type="search" [value]="busquedaEmpresa()" (input)="busquedaEmpresa.set($any($event.target).value)">
+              </label>
+              <label class="campo">
+                <span>Empresa</span>
+                <select [value]="clienteSeleccionado()?.id ?? ''" (change)="seleccionarClientePorId($any($event.target).value)">
+                  <option value="">Selecciona la empresa…</option>
+                  @for (e of empresasFiltradas(); track e.id) {
+                    <option [value]="e.id">{{ e.razonSocial }} · RUC {{ e.ruc }}</option>
                   }
-                </mat-select>
-              </mat-form-field>
-              <a mat-button routerLink="/clientes/nuevo">
-                <mat-icon>add_business</mat-icon> Registrar empresa como cliente
-              </a>
+                </select>
+              </label>
+              <a mat-button routerLink="/clientes/nuevo"><mat-icon>add_business</mat-icon> Registrar empresa como cliente</a>
             } @else {
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Cliente</mat-label>
-                <mat-select [value]="clienteSeleccionado()" (selectionChange)="seleccionarCliente($event.value)">
-                  <mat-option [value]="null">Público general (sin identificar)</mat-option>
-                  @for (cliente of clientes(); track cliente.id) {
-                    <mat-option [value]="cliente">
-                      {{ cliente.nombres }} {{ cliente.apellidos }} - {{ cliente.dni }}
-                    </mat-option>
+              <label class="campo">
+                <span>Cliente</span>
+                <select [value]="clienteSeleccionado()?.id ?? ''" (change)="seleccionarClientePorId($any($event.target).value)">
+                  <option value="">Público general (sin identificar)</option>
+                  @for (c of clientes(); track c.id) {
+                    <option [value]="c.id">{{ c.nombres }} {{ c.apellidos }} · DNI {{ c.dni }}</option>
                   }
-                </mat-select>
-              </mat-form-field>
+                </select>
+              </label>
             }
-
             @if (requisitoPendiente()) {
               <p class="requisito" role="alert">{{ requisitoPendiente() }}</p>
             }
-          </mat-card-content>
-        </mat-card>
+          </section>
 
-        <mat-card class="producto-card">
-          <mat-card-header>
-            <mat-card-title>Agregar Producto</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
-            <form [formGroup]="productoForm" (ngSubmit)="agregarProducto()">
-              <mat-form-field appearance="outline">
-                <mat-label>Producto</mat-label>
-                <mat-select formControlName="producto">
-                  @for (producto of productos(); track producto.id) {
-                    <mat-option [value]="producto" [disabled]="producto.stock === 0">
-                      {{ producto.nombre }} - S/{{ producto.precio }} (Stock: {{ producto.stock }})
-                    </mat-option>
-                  }
-                </mat-select>
-              </mat-form-field>
-
-              <mat-form-field appearance="outline">
-                <mat-label>Cantidad</mat-label>
-                <input matInput type="number" formControlName="cantidad" min="1">
-              </mat-form-field>
-
-              <button mat-raised-button color="accent" type="submit"
-                      [disabled]="productoForm.invalid">
-                <mat-icon>add_shopping_cart</mat-icon> Agregar
-              </button>
-            </form>
-          </mat-card-content>
-        </mat-card>
-      </div>
-
-      <mat-card class="detalles-card">
-        <mat-card-header>
-          <mat-card-title>Detalle de Venta</mat-card-title>
-        </mat-card-header>
-        <mat-card-content>
-          <table mat-table [dataSource]="detalles()" class="full-width">
-            <ng-container matColumnDef="producto">
-              <th mat-header-cell *matHeaderCellDef>Producto</th>
-              <td mat-cell *matCellDef="let row">{{ row.productoNombre }}</td>
-            </ng-container>
-
-            <ng-container matColumnDef="cantidad">
-              <th mat-header-cell *matHeaderCellDef>Cantidad</th>
-              <td mat-cell *matCellDef="let row">{{ row.cantidad }}</td>
-            </ng-container>
-
-            <ng-container matColumnDef="precioUnitario">
-              <th mat-header-cell *matHeaderCellDef>Precio Unit.</th>
-              <td mat-cell *matCellDef="let row">{{ row.precioUnitario | currency:'PEN':'S/ ' }}</td>
-            </ng-container>
-
-            <ng-container matColumnDef="subtotal">
-              <th mat-header-cell *matHeaderCellDef>Subtotal</th>
-              <td mat-cell *matCellDef="let row">{{ row.subtotal | currency:'PEN':'S/ ' }}</td>
-            </ng-container>
-
-            <ng-container matColumnDef="acciones">
-              <th mat-header-cell *matHeaderCellDef>Acciones</th>
-              <td mat-cell *matCellDef="let row; let i = index">
-                <button mat-icon-button color="warn" (click)="eliminarDetalle(i)">
-                  <mat-icon>delete</mat-icon>
-                </button>
-              </td>
-            </ng-container>
-
-            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-            <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-
-            <tr class="mat-row" *matNoDataRow>
-              <td class="mat-cell" colspan="5" style="text-align: center; padding: 20px;">
-                Agregue productos a la venta
-              </td>
-            </tr>
-          </table>
-
-          <div class="total-section">
-            <h2>TOTAL: {{ total() | currency:'PEN':'S/ ' }}</h2>
-          </div>
-
-          <section class="payment-panel" aria-labelledby="payment-heading">
-            <div>
-              <h3 id="payment-heading">Registrar forma de pago</h3>
-              <p>El pago se registra manualmente; KipuSalud no procesa transacciones externas.</p>
+          <section class="panel">
+            <h3 class="liquidacion-titulo">Liquidación de mostrador</h3>
+            <dl class="liquidacion">
+              <dt>Subtotal fármacos</dt><dd class="num">{{ total() | currency:'PEN':'S/ ' }}</dd>
+              <dt>IGV (incluido en el precio)</dt><dd class="num">{{ igv() | currency:'PEN':'S/ ' }}</dd>
+            </dl>
+            <div class="total-pagar">
+              <span class="kpi-label">Total a pagar<small>Soles (PEN)</small></span>
+              <strong class="num">{{ total() | currency:'PEN':'S/ ' }}</strong>
             </div>
-            <mat-form-field appearance="outline">
-              <mat-label>Método de pago</mat-label>
-              <mat-select [value]="metodoPago()" (selectionChange)="cambiarMetodoPago($event.value)">
-                <mat-option value="EFECTIVO">Efectivo</mat-option>
-                <mat-option value="YAPE">Yape</mat-option>
-                <mat-option value="PLIN">Plin</mat-option>
-                <mat-option value="TARJETA">Tarjeta</mat-option>
-                <mat-option value="TRANSFERENCIA">Transferencia</mat-option>
-              </mat-select>
-            </mat-form-field>
+
+            <h3 class="kpi-label">Forma de pago</h3>
+            <div class="metodos" role="radiogroup" aria-label="Forma de pago">
+              @for (m of metodos; track m.valor) {
+                <button type="button" role="radio" class="metodo" [class.activo]="metodoPago() === m.valor"
+                        [attr.aria-checked]="metodoPago() === m.valor" (click)="cambiarMetodoPago(m.valor)">
+                  <mat-icon>{{ m.icono }}</mat-icon>{{ m.etiqueta }}
+                </button>
+              }
+            </div>
 
             @if (metodoPago() === 'EFECTIVO') {
-              <mat-form-field appearance="outline">
-                <mat-label>Monto recibido</mat-label>
-                <span matTextPrefix>S/&nbsp;</span>
-                <input matInput type="number" min="0" step="0.01"
-                       [value]="montoRecibido()"
-                       (input)="actualizarMonto($event)">
-              </mat-form-field>
-              <div class="change-due">
-                <span>Vuelto</span>
-                <strong>{{ vuelto() | currency:'PEN':'S/ ' }}</strong>
+              <div class="efectivo">
+                <label class="monto">
+                  <span>Monto recibido S/</span>
+                  <input type="number" min="0" step="0.10" class="num" [value]="montoRecibido() || ''"
+                         (input)="actualizarMonto($event)" aria-label="Monto recibido">
+                </label>
+                <div class="montos-rapidos">
+                  @for (m of rapidosEfectivo(); track m; let primero = $first) {
+                    <button type="button" (click)="fijarMonto(m)" [class.exacto]="primero">
+                      {{ primero ? 'Exacto' : 'S/ ' + m }}
+                    </button>
+                  }
+                </div>
+                <div class="vuelto"><span>Vuelto a entregar</span><strong class="num">{{ vuelto() | currency:'PEN':'S/ ' }}</strong></div>
               </div>
             } @else {
-              <mat-checkbox [checked]="pagoExternoVerificado()"
-                            (change)="cambiarConfirmacionPagoExterno($event.checked)">
+              <mat-checkbox [checked]="pagoExternoVerificado()" (change)="cambiarConfirmacionPagoExterno($event.checked)">
                 Confirmo que verifiqué el pago fuera de KipuSalud
               </mat-checkbox>
             }
-          </section>
-        </mat-card-content>
 
-        <mat-card-actions align="end">
-          <button mat-button (click)="cancelar()">Cancelar</button>
-          <button mat-raised-button color="primary"
-                  (click)="confirmarVenta()"
-                  [disabled]="!puedeConfirmar()">
-            <mat-icon>check</mat-icon> Registrar venta con {{ etiquetaComprobante() }}
-          </button>
-        </mat-card-actions>
-      </mat-card>
+            <button type="button" class="registrar" (click)="confirmarVenta()" [disabled]="!puedeConfirmar()">
+              <mat-icon>verified</mat-icon>
+              <span>Registrar venta con {{ etiquetaComprobante() }} <kbd>F10</kbd></span>
+            </button>
+            <p class="nota centro">
+              @switch (tipoComprobante()) {
+                @case ('BOLETA_INTERNA') { Se emitirá una boleta interna numerada (serie I001). }
+                @case ('BOLETA_ELECTRONICA') { Se emitirá una boleta electrónica y se enviará a SUNAT. }
+                @case ('FACTURA') { Se emitirá una factura electrónica y se enviará a SUNAT. }
+              }
+            </p>
+            <button mat-button type="button" class="cancelar" (click)="cancelar()">Cancelar</button>
+          </section>
+        </aside>
+      </div>
     </div>
   `,
   styles: `
-    .tipos-comprobante { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-    .tipos-comprobante mat-radio-button { align-items: flex-start; }
+    .caja { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border: 1px solid var(--kipu-line);
+      border-radius: var(--kipu-radius); background: #fff; }
+    .caja mat-icon { color: var(--kipu-primary); }
+    .caja span { display: flex; flex-direction: column; line-height: 1.2; }
+    .caja small { color: var(--kipu-soft); font-size: 12px; }
+    .pos-grid { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(320px, 1fr); gap: 20px; align-items: start; }
+    .pos-main, .pos-lateral { display: grid; gap: 20px; min-width: 0; }
+    .panel { padding: 18px 20px; border: 1px solid var(--kipu-line); border-radius: var(--kipu-radius); background: #fff;
+      box-shadow: 0 1px 3px rgba(41, 39, 31, .04); }
+    .buscador { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 14px;
+      border: 1px solid var(--kipu-line); border-radius: var(--kipu-radius-sm); background: var(--kipu-paper); }
+    .buscador:focus-within { border-color: var(--kipu-ink); }
+    .buscador input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 15px; }
+    .buscador mat-icon { color: var(--kipu-soft); }
+    kbd { padding: 2px 6px; border: 1px solid var(--kipu-line); border-radius: 4px; background: var(--kipu-surface-high);
+      font: 600 11px "Space Grotesk", sans-serif; }
+    .resultados { list-style: none; margin: 10px 0 0; padding: 0; border: 1px solid var(--kipu-line); border-radius: var(--kipu-radius-sm); }
+    .resultados li + li { border-top: 1px solid var(--kipu-line); }
+    .resultados button { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; width: 100%;
+      padding: 10px 12px; border: 0; background: #fff; text-align: left; cursor: pointer; }
+    .resultados button:hover:not(:disabled) { background: #fdfbf7; }
+    .resultados button:disabled { opacity: .55; cursor: not-allowed; }
+    .resultados small, .tabla-despacho small, .rapido small { display: block; color: var(--kipu-soft); font-size: 12px; }
+    .vacio { padding: 14px; color: var(--kipu-soft); text-align: center; }
+    .rapidos-cabecera { display: flex; justify-content: space-between; margin: 16px 0 8px; }
+    .tiempo-real { color: var(--kipu-ok-fg); font-size: 12px; font-weight: 600; }
+    .rapidos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+    .rapido { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px; border: 1px solid var(--kipu-line);
+      border-radius: var(--kipu-radius-sm); background: var(--kipu-paper); text-align: left; cursor: pointer; }
+    .rapido:hover:not(:disabled) { border-color: var(--kipu-primary-container); }
+    .rapido:disabled { opacity: .55; cursor: not-allowed; }
+    .rapido strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rapido small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rapido-pie { display: flex; justify-content: space-between; align-items: end; gap: 6px; margin-top: 8px; }
+    .precio { color: var(--kipu-primary); font: 600 18px "Space Grotesk", sans-serif; }
+    .despacho { padding: 0; overflow: hidden; }
+    .despacho-cabecera { display: flex; align-items: center; gap: 12px; padding: 14px 20px; background: var(--kipu-paper);
+      border-bottom: 1px solid var(--kipu-line); }
+    .despacho-cabecera h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 17px; }
+    .despacho-cabecera h2 mat-icon { color: var(--kipu-primary); }
+    .tabla-despacho { width: 100%; border-collapse: collapse; }
+    .tabla-despacho th { padding: 10px 12px; border-bottom: 2px solid var(--kipu-line); color: var(--kipu-soft);
+      font-size: 11px; font-weight: 600; letter-spacing: .06em; text-align: left; text-transform: uppercase; }
+    .tabla-despacho td { padding: 12px; border-bottom: 1px solid var(--kipu-line); vertical-align: middle; }
+    .tabla-despacho .num { text-align: right; }
+    .stepper { display: inline-flex; align-items: center; gap: 4px; padding: 2px; border-radius: var(--kipu-radius-sm);
+      background: var(--kipu-surface-high); }
+    .stepper button { width: 28px; height: 28px; border: 0; border-radius: 4px; background: transparent; font-size: 18px; cursor: pointer; }
+    .stepper button:hover:not(:disabled) { background: #fff; }
+    .stepper button:disabled { opacity: .4; cursor: not-allowed; }
+    .stepper span { min-width: 28px; text-align: center; font-weight: 600; }
+    .atajos { display: flex; flex-wrap: wrap; gap: 16px; padding: 10px 20px; background: var(--kipu-paper);
+      color: var(--kipu-soft); font-size: 12px; }
+    .kpi-label { display: block; margin: 0 0 8px; color: var(--kipu-soft); font-size: 11px; font-weight: 600;
+      letter-spacing: .08em; text-transform: uppercase; }
+    .kpi-label small { display: block; letter-spacing: 0; text-transform: none; font-weight: 500; }
+    .tipos-comprobante { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
     .tipo-titulo { display: block; font-weight: 600; }
-    .tipo-ayuda { display: block; font-size: 12px; color: #62594e; }
-    .nota { font-size: 13px; color: #62594e; margin: 0 0 12px; }
-    .requisito { color: #8a4b00; background: #fff4e0; padding: 8px 12px; border-radius: 6px; margin: 0; }
+    .tipo-ayuda { display: block; font-size: 12px; color: var(--kipu-soft); }
+    .campo { display: grid; gap: 4px; margin-bottom: 10px; font-size: 12px; color: var(--kipu-soft); }
+    .campo input, .campo select { height: 40px; padding: 0 10px; border: 1px solid var(--kipu-line);
+      border-radius: var(--kipu-radius-sm); background: #fff; color: var(--kipu-ink); font-size: 14px; }
+    .campo input:focus, .campo select:focus { outline: 1px solid var(--kipu-ink); }
+    .nota { font-size: 12px; color: var(--kipu-soft); margin: 0 0 12px; }
+    .nota.centro { margin: 8px 0 0; text-align: center; }
+    .requisito { color: var(--kipu-warn-fg); background: var(--kipu-warn-bg); border: 1px solid var(--kipu-warn-border);
+      padding: 8px 12px; border-radius: var(--kipu-radius-sm); margin: 4px 0 0; font-size: 13px; }
+    .liquidacion-titulo { margin: 0 0 12px; font-size: 18px; }
+    .liquidacion { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin: 0 0 12px; }
+    .liquidacion dt { color: var(--kipu-muted); }
+    .liquidacion dd { margin: 0; }
+    .total-pagar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px;
+      padding: 14px 16px; border: 1px solid var(--kipu-line); border-radius: var(--kipu-radius); background: var(--kipu-paper); }
+    .total-pagar .kpi-label { margin: 0; }
+    .total-pagar strong { color: var(--kipu-primary); font-size: clamp(28px, 3vw, 38px); line-height: 1; }
+    .metodos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
+    .metodo { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px;
+      border: 1px solid var(--kipu-line); border-radius: var(--kipu-radius-sm); background: var(--kipu-paper);
+      color: var(--kipu-ink); font-size: 12px; font-weight: 600; cursor: pointer; }
+    .metodo.activo { border-color: var(--kipu-primary-container); background: var(--kipu-primary-container); color: #fff; }
+    .efectivo { padding: 12px; border-radius: var(--kipu-radius); background: var(--kipu-paper); border: 1px solid var(--kipu-line); }
+    .monto { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 600; }
+    .monto input { width: 130px; height: 44px; padding: 0 10px; border: 1px solid var(--kipu-line); border-radius: var(--kipu-radius-sm);
+      background: #fff; font-size: 22px; text-align: right; }
+    .montos-rapidos { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin: 8px 0; }
+    .montos-rapidos button { padding: 4px 10px; border: 1px solid var(--kipu-line); border-radius: var(--kipu-radius-sm);
+      background: #fff; font: 600 13px "Space Grotesk", sans-serif; cursor: pointer; }
+    .montos-rapidos button.exacto { background: var(--kipu-ok-bg); color: var(--kipu-ok-fg); border-color: var(--kipu-ok-border); }
+    .vuelto { display: flex; justify-content: space-between; align-items: baseline; font-weight: 600; }
+    .vuelto strong { color: var(--kipu-ok-fg); font-size: 26px; }
+    .registrar { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 60px; margin-top: 16px;
+      border: 0; border-radius: var(--kipu-radius-sm); background: var(--kipu-primary); color: #fff;
+      font: 600 17px "Space Grotesk", sans-serif; cursor: pointer; }
+    .registrar:hover:not(:disabled) { background: var(--kipu-primary-dark); }
+    .registrar:disabled { opacity: .5; cursor: not-allowed; }
+    .registrar kbd { color: var(--kipu-ink); }
+    .cancelar { display: block; margin: 6px auto 0; }
+    @media (max-width: 1100px) { .pos-grid { grid-template-columns: 1fr; } }
   `
 })
 export class VentaNuevaComponent implements OnInit {
-  private fb = inject(FormBuilder);
   private clienteService = inject(ClienteService);
   private productoService = inject(ProductoService);
   private ventaService = inject(VentaService);
   private facturacionService = inject(FacturacionService);
+  private authService = inject(AuthService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private snackBar = inject(MatSnackBar);
 
+  @ViewChild('buscador') buscador?: ElementRef<HTMLInputElement>;
+
+  readonly metodos = METODOS_PAGO;
+  usuario = computed(() => this.authService.usuario()?.username ?? '');
+  rol = computed(() => etiquetaRol(this.authService.usuario()?.rol));
+
   clientes = signal<Cliente[]>([]);
   productos = signal<Producto[]>([]);
-  detalles = signal<DetalleVenta[]>([]);
+  ventasRecientes = signal<Venta[]>([]);
+  detalles = signal<LineaDespacho[]>([]);
   loadError = signal<string | null>(null);
   clienteSeleccionado = signal<Cliente | null>(null);
   private pendingVentaKey: string | null = null;
@@ -285,17 +417,38 @@ export class VentaNuevaComponent implements OnInit {
   tipoComprobante = signal<TipoComprobante>('BOLETA_INTERNA');
   opciones = signal<OpcionesComprobante | null>(null);
   busquedaEmpresa = signal('');
+  busqueda = signal('');
 
   montoMinimoConDocumento = computed(() => this.opciones()?.montoMinimoBoletaConDocumento ?? 700);
   etiquetaComprobante = computed(() => TIPOS_COMPROBANTE[this.tipoComprobante()].toLowerCase());
 
   /** Clientes con datos completos para recibir factura. */
-  empresas = computed(() => this.clientes().filter(clienteFacturable));
+  empresas = computed(() => this.clientes().filter(c => clienteFacturable(c)));
   empresasFiltradas = computed(() => {
     const texto = this.busquedaEmpresa().trim().toLowerCase();
     return this.empresas().filter(e => !texto
       || (e.razonSocial ?? '').toLowerCase().includes(texto)
       || (e.ruc ?? '').includes(texto));
+  });
+
+  resultados = computed(() => {
+    const texto = this.busqueda().trim().toLowerCase();
+    return texto ? this.productos()
+      .filter(p => `${p.nombre} ${p.descripcion ?? ''}`.toLowerCase().includes(texto))
+      .slice(0, 8) : [];
+  });
+
+  /** Los seis productos con stock más vendidos en las ventas cargadas (o los primeros con stock). */
+  rapidos = computed(() => {
+    const vendidos = new Map<number, number>();
+    for (const v of this.ventasRecientes()) {
+      if (v.estado !== 'CONFIRMADA') continue;
+      for (const d of v.detalles) vendidos.set(d.productoId, (vendidos.get(d.productoId) ?? 0) + d.cantidad);
+    }
+    return [...this.productos()]
+      .filter(p => p.stock > 0)
+      .sort((a, b) => (vendidos.get(b.id!) ?? 0) - (vendidos.get(a.id!) ?? 0) || a.nombre.localeCompare(b.nombre))
+      .slice(0, 6);
   });
 
   /** Qué le falta a la venta para el comprobante elegido; null si nada. */
@@ -314,12 +467,13 @@ export class VentaNuevaComponent implements OnInit {
     }
   });
 
-  displayedColumns = ['producto', 'cantidad', 'precioUnitario', 'subtotal', 'acciones'];
-
-  total = computed(() =>
-    this.detalles().reduce((sum, d) => sum + d.subtotal, 0)
-  );
-  vuelto = computed(() => Math.max(0, this.montoRecibido() - this.total()));
+  total = computed(() => redondear(this.detalles().reduce((sum, d) => sum + d.subtotal, 0)));
+  igv = computed(() => redondear(this.detalles()
+    .filter(d => d.afectacionIgv === '10')
+    .reduce((sum, d) => sum + d.subtotal - d.subtotal / (1 + IGV), 0)));
+  unidades = computed(() => this.detalles().reduce((sum, d) => sum + d.cantidad, 0));
+  vuelto = computed(() => Math.max(0, redondear(this.montoRecibido() - this.total())));
+  rapidosEfectivo = computed(() => montosRapidos(this.total()));
   puedeConfirmar = computed(() => !this.requisitoPendiente()
     && this.detalles().length > 0
     && !this.loading()
@@ -327,10 +481,16 @@ export class VentaNuevaComponent implements OnInit {
       ? this.montoRecibido() >= this.total()
       : this.pagoExternoVerificado()));
 
-  productoForm = this.fb.group({
-    producto: [null as Producto | null, Validators.required],
-    cantidad: [1, [Validators.required, Validators.min(1)]]
-  });
+  @HostListener('document:keydown', ['$event'])
+  atajos(event: KeyboardEvent) {
+    if (event.key === 'F2') {
+      event.preventDefault();
+      this.buscador?.nativeElement.focus();
+    } else if (event.key === 'F10') {
+      event.preventDefault();
+      this.confirmarVenta();
+    }
+  }
 
   ngOnInit() {
     this.loadError.set(null);
@@ -359,31 +519,64 @@ export class VentaNuevaComponent implements OnInit {
         this.loadError.set('No se pudieron cargar los productos. No se puede registrar una venta.');
       }
     });
+    // Solo sirve para ordenar los productos rápidos; si falla, se muestran por nombre.
+    this.ventaService.listar().subscribe({
+      next: ventas => this.ventasRecientes.set(ventas.slice(0, 200)),
+      error: err => console.error('No se pudieron cargar las ventas recientes.', err)
+    });
   }
 
-  agregarProducto() {
-    const { producto, cantidad } = this.productoForm.value;
-    if (!producto || !cantidad) return;
+  agregarPrimerResultado(event: Event) {
+    event.preventDefault();
+    const primero = this.resultados().find(p => p.stock > 0);
+    if (primero) this.agregar(primero);
+  }
 
-    const cantidadEnCarrito = this.detalles()
-      .filter(detalle => detalle.productoId === producto.id)
-      .reduce((total, detalle) => total + detalle.cantidad, 0);
-    if (cantidad + cantidadEnCarrito > producto.stock) {
+  /** Agrega una unidad del producto o suma una a su línea si ya está en el despacho. */
+  agregar(producto: Producto) {
+    const indice = this.detalles().findIndex(d => d.productoId === producto.id);
+    if (indice >= 0) {
+      this.cambiarCantidad(indice, 1);
+    } else if (producto.stock > 0) {
+      this.detalles.update(arr => [...arr, {
+        productoId: producto.id!,
+        productoNombre: producto.nombre,
+        descripcion: producto.descripcion,
+        cantidad: 1,
+        precioUnitario: producto.precio,
+        subtotal: importeLinea(producto.precio, 1, producto.afectacionIgv, producto.precioIncluyeIgv),
+        afectacionIgv: producto.afectacionIgv ?? null,
+        precioIncluyeIgv: producto.precioIncluyeIgv ?? null,
+        stock: producto.stock
+      }]);
+      this.pendingVentaKey = null;
+    }
+    this.busqueda.set('');
+  }
+
+  cambiarCantidad(indice: number, delta: number) {
+    const linea = this.detalles()[indice];
+    if (!linea) return;
+    const cantidad = linea.cantidad + delta;
+    if (cantidad < 1) {
+      this.eliminarDetalle(indice);
+      return;
+    }
+    if (cantidad > linea.stock) {
       this.snackBar.open('Stock insuficiente', 'OK', { duration: 3000 });
       return;
     }
-
-    const detalle: DetalleVenta = {
-      productoId: producto.id!,
-      productoNombre: producto.nombre,
-      cantidad: cantidad,
-      precioUnitario: producto.precio,
-      subtotal: producto.precio * cantidad
-    };
-
-    this.detalles.update(arr => [...arr, detalle]);
+    this.detalles.update(arr => arr.map((d, i) => i === indice ? {
+      ...d,
+      cantidad,
+      subtotal: importeLinea(d.precioUnitario, cantidad, d.afectacionIgv, d.precioIncluyeIgv)
+    } : d));
     this.pendingVentaKey = null;
-    this.productoForm.reset({ cantidad: 1 });
+  }
+
+  vaciar() {
+    this.detalles.set([]);
+    this.pendingVentaKey = null;
   }
 
   cambiarTipoComprobante(tipo: TipoComprobante): void {
@@ -394,8 +587,8 @@ export class VentaNuevaComponent implements OnInit {
     this.pendingVentaKey = null;
   }
 
-  buscarEmpresa(event: Event): void {
-    this.busquedaEmpresa.set((event.target as HTMLInputElement).value);
+  seleccionarClientePorId(id: string): void {
+    this.seleccionarCliente(this.clientes().find(c => String(c.id) === id) ?? null);
   }
 
   seleccionarCliente(cliente: Cliente | null): void {
@@ -418,6 +611,11 @@ export class VentaNuevaComponent implements OnInit {
   actualizarMonto(event: Event) {
     const valor = Number((event.target as HTMLInputElement).value);
     this.montoRecibido.set(Number.isFinite(valor) ? Math.max(0, valor) : 0);
+    this.pendingVentaKey = null;
+  }
+
+  fijarMonto(monto: number) {
+    this.montoRecibido.set(monto);
     this.pendingVentaKey = null;
   }
 
