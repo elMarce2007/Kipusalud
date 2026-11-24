@@ -21,6 +21,11 @@ public record VentaDto(
         /** BOLETA_INTERNA (por defecto), BOLETA_ELECTRONICA o FACTURA. */
         String tipoComprobante,
         String serieComprobante,
-        String numeroComprobante
+        String numeroComprobante,
+        /** Usuario que registró la venta. */
+        String registradoPor,
+        /** Copia del cliente al vender (nombre o razón social, y documento). */
+        String clienteNombre,
+        String clienteDocumento
 ) {
 }

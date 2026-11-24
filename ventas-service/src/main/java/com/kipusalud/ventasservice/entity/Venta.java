@@ -63,6 +63,18 @@ public class Venta {
     @Column(name = "numero_comprobante", length = 8)
     private String numeroComprobante;
 
+    /** Usuario que registró la venta (despachador). */
+    @Column(name = "registrado_por", length = 150)
+    private String registradoPor;
+
+    /** Copia del cliente al vender: razón social en facturas, nombres en boletas. */
+    @Column(name = "cliente_nombre", length = 200)
+    private String clienteNombre;
+
+    /** "DNI 12345678" o "RUC 20123456789". */
+    @Column(name = "cliente_documento", length = 20)
+    private String clienteDocumento;
+
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinTable(
             name = "ventas_detalles",
@@ -79,6 +91,13 @@ public class Venta {
     public void setSerieComprobante(String serieComprobante) { this.serieComprobante = serieComprobante; }
     public String getNumeroComprobante() { return numeroComprobante; }
     public void setNumeroComprobante(String numeroComprobante) { this.numeroComprobante = numeroComprobante; }
+
+    public String getRegistradoPor() { return registradoPor; }
+    public void setRegistradoPor(String registradoPor) { this.registradoPor = registradoPor; }
+    public String getClienteNombre() { return clienteNombre; }
+    public void setClienteNombre(String clienteNombre) { this.clienteNombre = clienteNombre; }
+    public String getClienteDocumento() { return clienteDocumento; }
+    public void setClienteDocumento(String clienteDocumento) { this.clienteDocumento = clienteDocumento; }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

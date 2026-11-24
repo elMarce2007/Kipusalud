@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { Venta, VentaCreate } from '../models/venta.model';
+import { ResumenCliente, Venta, VentaCreate } from '../models/venta.model';
 import { MENSAJES_POR_ESTADO } from '../core/interceptors/error.interceptor';
 
 @Injectable({ providedIn: 'root' })
@@ -31,5 +31,10 @@ export class VentaService {
 
   reintentar(id: number): Observable<Venta> {
     return this.http.post<Venta>(`${this.apiUrl}/${id}/reintentar`, {});
+  }
+
+  /** Compras confirmadas por cliente (número, total y última compra). */
+  resumenClientes(): Observable<ResumenCliente[]> {
+    return this.http.get<ResumenCliente[]>(`${this.apiUrl}/clientes/resumen`);
   }
 }

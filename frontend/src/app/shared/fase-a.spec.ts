@@ -46,3 +46,14 @@ describe('vencimiento de lotes', () => {
     expect(tonoVencimiento(null)).toBe('neutral');
   });
 });
+
+import { clienteDeVenta } from '../models/venta.model';
+
+describe('clienteDeVenta', () => {
+  it('prefiere la copia guardada al vender y usa "Público general" sin cliente', () => {
+    const base = { fecha: '2026-11-24', total: 1, detalles: [] };
+    expect(clienteDeVenta({ ...base, clienteId: 5, clienteNombre: 'Clínica SAC' }, new Map([[5, 'Otro']]))).toBe('Clínica SAC');
+    expect(clienteDeVenta({ ...base, clienteId: 5 }, new Map([[5, 'Ana Demo']]))).toBe('Ana Demo');
+    expect(clienteDeVenta({ ...base, clienteId: null })).toBe('Público general');
+  });
+});

@@ -96,6 +96,7 @@ Controlador: `ventas-service/.../controller/VentaController.java`.
 | GET | `/api/ventas` | `VENTAS:VER` |
 | GET | `/api/ventas/{id}` | `VENTAS:VER` |
 | POST | `/api/ventas` | `VENTAS:GESTIONAR`; requiere clave idempotente, detalles y `tipoComprobante` (`BOLETA_INTERNA` por defecto, `BOLETA_ELECTRONICA` o `FACTURA`). Cliente opcional en boletas, obligatorio con RUC en factura; boleta electrónica desde S/ 700 exige DNI. Al confirmar, la boleta interna recibe correlativo `I001-…` y los electrónicos se emiten en SUNAT automáticamente. `201` si confirmada, `202` si pendiente, `412` si el comprobante electrónico no está habilitado |
+| GET | `/api/ventas/clientes/resumen` | `VENTAS:VER`; por cliente: compras confirmadas, total comprado y fecha de la última compra |
 | POST | `/api/ventas/{id}/reintentar` | `VENTAS:GESTIONAR`; reintenta solo venta `PENDIENTE_STOCK` |
 | GET | `/api/ventas/facturacion/configuracion` | Solo administrador/QF; perfil fiscal sin secretos (`404` si no existe) |
 | PUT | `/api/ventas/facturacion/configuracion` | Solo administrador/QF; perfil fiscal: RUC, razón social, dirección, ubigeo, series `F###` y `B###`, teléfono y correo. No recibe secretos |
@@ -106,6 +107,8 @@ Controlador: `ventas-service/.../controller/VentaController.java`.
 | GET | `/api/ventas/{id}/factura-electronica/cdr` | `VENTAS:VER`; devuelve ZIP |
 | POST | `/api/ventas/{id}/factura-electronica/consultar-sunat` | `VENTAS:GESTIONAR`; reconcilia estado remoto |
 
+Cada venta guarda `registradoPor` (usuario que la registró) y una copia del cliente al
+vender (`clienteNombre`, `clienteDocumento`), usadas en el historial y el comprobante.
 Estados de venta incluyen `PENDIENTE_STOCK` y `CONFIRMADA`; los estados de
 comprobante SUNAT y sus restricciones se explican en
 [la guía SUNAT](sunat-electronic-invoicing.md).

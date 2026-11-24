@@ -10,7 +10,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 
 import { VentaService } from '../../../services/venta.service';
-import { TIPOS_COMPROBANTE, Venta } from '../../../models/venta.model';
+import { TIPOS_COMPROBANTE, Venta, clienteDeVenta } from '../../../models/venta.model';
 import { ClienteService } from '../../../services/cliente.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../../shared/components/kpi-card/kpi-card.component';
@@ -79,6 +79,10 @@ import { descargarCsv } from '../../../shared/utils/csv';
           <option value="BOLETA_ELECTRONICA">Boleta electrónica</option>
           <option value="FACTURA">Factura</option>
         </select>
+        <select aria-label="Usuario que atendió" [value]="cajero()" (change)="cajero.set($any($event.target).value)">
+          <option value="">Todos los operadores</option>
+          @for (c of cajeros(); track c) { <option [value]="c">{{ c }}</option> }
+        </select>
         <span class="filter-count">{{ filtradas().length }} ventas · {{ totalFiltrado() | currency:'PEN':'S/ ' }}</span>
       </div>
 
@@ -105,7 +109,15 @@ import { descargarCsv } from '../../../shared/utils/csv';
 
               <ng-container matColumnDef="cliente">
                 <th mat-header-cell *matHeaderCellDef>Cliente</th>
-                <td mat-cell *matCellDef="let row">{{ nombreCliente(row) }}</td>
+                <td mat-cell *matCellDef="let row">
+                  {{ nombreCliente(row) }}
+                  @if (row.clienteDocumento) { <small class="sub">{{ row.clienteDocumento }}</small> }
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="atendidoPor">
+                <th mat-header-cell *matHeaderCellDef>Atendido por</th>
+                <td mat-cell *matCellDef="let row">{{ row.registradoPor || '—' }}</td>
               </ng-container>
 
               <ng-container matColumnDef="metodoPago">
@@ -146,7 +158,7 @@ import { descargarCsv } from '../../../shared/utils/csv';
               <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
 
               <tr class="mat-row" *matNoDataRow>
-                <td class="mat-cell" colspan="7" style="text-align: center; padding: 20px;">
+                <td class="mat-cell" colspan="8" style="text-align: center; padding: 20px;">
                   No hay ventas en el rango y filtros elegidos
                 </td>
               </tr>
@@ -167,7 +179,7 @@ export class VentaListComponent implements OnInit, AfterViewInit {
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
 
-  displayedColumns = ['comprobante', 'fecha', 'cliente', 'metodoPago', 'total', 'estado', 'acciones'];
+  displayedColumns = ['comprobante', 'fecha', 'cliente', 'atendidoPor', 'metodoPago', 'total', 'estado', 'acciones'];
   dataSource = new MatTableDataSource<Venta>();
   loadError = signal<string | null>(null);
   retryingId = signal<number | null>(null);
@@ -177,6 +189,8 @@ export class VentaListComponent implements OnInit, AfterViewInit {
   texto = signal('');
   rango = signal('todo');
   tipo = signal('');
+  cajero = signal('');
+  cajeros = computed(() => [...new Set(this.ventas().map(v => v.registradoPor).filter((c): c is string => !!c))].sort());
 
   resumenHoy = computed(() => {
     const hoy = new Date().toDateString();
@@ -199,6 +213,7 @@ export class VentaListComponent implements OnInit, AfterViewInit {
       const buscable = `${this.numero(v)} ${v.id} ${this.nombreCliente(v)}`.toLowerCase();
       return (!desde || fecha >= desde)
         && (!tipo || (v.tipoComprobante ?? 'BOLETA_INTERNA') === tipo)
+        && (!this.cajero() || v.registradoPor === this.cajero())
         && (!texto || buscable.includes(texto));
     });
   });
@@ -223,13 +238,15 @@ export class VentaListComponent implements OnInit, AfterViewInit {
   }
 
   nombreCliente(v: Venta): string {
-    return v.clienteId ? this.nombresCliente().get(v.clienteId) ?? `Cliente #${v.clienteId}` : 'Público general';
+    return clienteDeVenta(v, this.nombresCliente());
   }
 
   exportar() {
-    descargarCsv('ventas.csv', ['Comprobante', 'Tipo', 'Fecha', 'Cliente', 'Pago', 'Total', 'Estado'],
+    descargarCsv('ventas.csv',
+      ['Comprobante', 'Tipo', 'Fecha', 'Cliente', 'Documento', 'Atendido por', 'Pago', 'Total', 'Estado'],
       this.filtradas().map(v => [this.numero(v), this.tipoLabel(v), new Date(v.fecha).toLocaleString('es-PE'),
-        this.nombreCliente(v), this.metodoPagoLabel(v.metodoPago), v.total, this.estadoLabel(v.estado)]));
+        this.nombreCliente(v), v.clienteDocumento ?? '', v.registradoPor ?? '', this.metodoPagoLabel(v.metodoPago),
+        v.total, this.estadoLabel(v.estado)]));
   }
 
   tipoLabel(venta: Venta): string {

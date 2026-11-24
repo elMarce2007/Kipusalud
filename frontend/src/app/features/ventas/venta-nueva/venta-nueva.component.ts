@@ -15,7 +15,7 @@ import { FacturacionService } from '../../../services/facturacion.service';
 import { AuthService } from '../../../services/auth.service';
 import { Cliente, clienteFacturable } from '../../../models/cliente.model';
 import { Producto } from '../../../models/producto.model';
-import { DetalleVenta, MetodoPago, TIPOS_COMPROBANTE, TipoComprobante, Venta } from '../../../models/venta.model';
+import { DetalleVenta, MetodoPago, TIPOS_COMPROBANTE, TipoComprobante, Venta, clienteDeVenta } from '../../../models/venta.model';
 import { OpcionesComprobante } from '../../../models/facturacion.model';
 import { createIdempotencyKey } from '../../../core/utils/idempotency-key';
 import { etiquetaRol } from '../../../core/utils/roles';
@@ -304,6 +304,40 @@ export function montosRapidos(total: number): number[] {
           </section>
         </aside>
       </div>
+
+      <section class="panel ultimas" aria-labelledby="ultimas-titulo">
+        <header class="ultimas-cabecera">
+          <div>
+            <h2 id="ultimas-titulo"><mat-icon>history</mat-icon> Últimas ventas realizadas hoy</h2>
+            <p class="nota">Registro correlativo de la farmacia.</p>
+          </div>
+          <span class="chip">Despachos hoy: {{ ventasHoy().length }}</span>
+          <span class="chip ok">Acumulado: {{ totalHoy() | currency:'PEN':'S/ ' }}</span>
+        </header>
+        <div class="table-wrap">
+          <table class="tabla-despacho">
+            <thead><tr><th>N° comprobante</th><th>Hora</th><th>Cliente</th><th>Método</th><th>Despachador</th>
+              <th class="num">Total</th><th>Estado</th><th></th></tr></thead>
+            <tbody>
+              @for (v of ventasHoy().slice(0, 8); track v.id) {
+                <tr>
+                  <td class="mono">{{ numeroVenta(v) }}</td>
+                  <td>{{ v.fecha | date:'HH:mm' }}</td>
+                  <td>{{ clienteVenta(v) }}@if (v.clienteDocumento) { <small>{{ v.clienteDocumento }}</small> }</td>
+                  <td><span class="chip">{{ etiquetaMetodo(v.metodoPago) }}</span></td>
+                  <td>{{ v.registradoPor || '—' }}</td>
+                  <td class="num"><strong>{{ v.total | currency:'PEN':'S/ ' }}</strong></td>
+                  <td><span class="chip" [class.ok]="v.estado === 'CONFIRMADA'" [class.warn]="v.estado !== 'CONFIRMADA'">
+                    {{ v.estado === 'CONFIRMADA' ? 'Completada' : 'Pendiente' }}</span></td>
+                  <td><a mat-icon-button [routerLink]="['/ventas', v.id]" aria-label="Ver e imprimir comprobante"><mat-icon>print</mat-icon></a></td>
+                </tr>
+              } @empty {
+                <tr><td colspan="8" class="vacio">Aún no hay ventas hoy.</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   `,
   styles: `
@@ -408,6 +442,12 @@ export function montosRapidos(total: number): number[] {
     .registrar:disabled { opacity: .5; cursor: not-allowed; }
     .registrar kbd { color: var(--kipu-ink); }
     .cancelar { display: block; margin: 6px auto 0; }
+    .ultimas { margin-top: 20px; padding: 0; overflow: hidden; }
+    .ultimas-cabecera { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 20px;
+      border-bottom: 1px solid var(--kipu-line); }
+    .ultimas-cabecera > div { flex: 1; min-width: 220px; }
+    .ultimas-cabecera h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 17px; }
+    .ultimas-cabecera .nota { margin: 2px 0 0; }
     @media (max-width: 1100px) { .pos-grid { grid-template-columns: 1fr; } }
   `
 })
@@ -479,6 +519,26 @@ export class VentaNuevaComponent implements OnInit {
       .sort((a, b) => (vendidos.get(b.id!) ?? 0) - (vendidos.get(a.id!) ?? 0) || a.nombre.localeCompare(b.nombre))
       .slice(0, 6);
   });
+
+  ventasHoy = computed(() => {
+    const hoy = new Date().toDateString();
+    return this.ventasRecientes().filter(v => new Date(v.fecha).toDateString() === hoy);
+  });
+  totalHoy = computed(() => this.ventasHoy()
+    .filter(v => v.estado === 'CONFIRMADA').reduce((s, v) => s + Number(v.total ?? 0), 0));
+
+  numeroVenta(v: Venta): string {
+    return v.serieComprobante && v.numeroComprobante ? `${v.serieComprobante}-${v.numeroComprobante}` : `Venta #${v.id}`;
+  }
+
+  clienteVenta(v: Venta): string {
+    return clienteDeVenta(v, new Map(this.clientes().filter(c => c.id != null)
+      .map(c => [c.id!, `${c.nombres} ${c.apellidos}`.trim()])));
+  }
+
+  etiquetaMetodo(metodo?: string): string {
+    return METODOS_PAGO.find(m => m.valor === metodo)?.etiqueta ?? (metodo || '—');
+  }
 
   /** Qué le falta a la venta para el comprobante elegido; null si nada. */
   requisitoPendiente = computed((): string | null => {

@@ -26,7 +26,6 @@ export interface Venta {
   clienteId: number | null;
   total: number;
   detalles: DetalleVenta[];
-  clienteNombre?: string;
   metodoPago?: MetodoPago;
   montoRecibido?: number;
   vuelto?: number;
@@ -39,6 +38,26 @@ export interface Venta {
   tipoComprobante?: TipoComprobante;
   serieComprobante?: string | null;
   numeroComprobante?: string | null;
+  /** Usuario que registró la venta (despachador). */
+  registradoPor?: string | null;
+  /** Copia del cliente al vender. */
+  clienteNombre?: string | null;
+  clienteDocumento?: string | null;
+}
+
+/** Compras confirmadas de un cliente. */
+export interface ResumenCliente {
+  clienteId: number;
+  compras: number;
+  totalComprado: number;
+  ultimaCompra: string;
+}
+
+/** Nombre a mostrar: la copia guardada al vender, o "Público general" si no hubo cliente. */
+export function clienteDeVenta(v: Venta, nombres?: Map<number, string>): string {
+  if (v.clienteNombre) return v.clienteNombre;
+  if (!v.clienteId) return 'Público general';
+  return nombres?.get(v.clienteId) ?? `Cliente #${v.clienteId}`;
 }
 
 export type MetodoPago = 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';

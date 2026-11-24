@@ -75,6 +75,20 @@ class VentaComprobanteTest {
     }
 
     @Test
+    void guardaQuienVendioYUnaCopiaDelCliente() {
+        CorrelativoComprobante correlativo = new CorrelativoComprobante(FARMACIA, "I001");
+        when(correlativos.findForUpdate(FARMACIA, "I001")).thenReturn(Optional.of(correlativo));
+        when(clienteClient.obtenerCliente(5L)).thenReturn(new ClienteClient.ClienteDto(
+                5L, "Ana", "Demo", "12345678", "9", "a@example.invalid", null, null, null));
+
+        VentaDto venta = service.crear(solicitud(null, 5L));
+
+        assertEquals("usuario-prueba", venta.registradoPor());
+        assertEquals("Ana Demo", venta.clienteNombre());
+        assertEquals("DNI 12345678", venta.clienteDocumento());
+    }
+
+    @Test
     void facturaSinClienteSeRechazaAntesDeTocarInventario() {
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
                 () -> service.crear(solicitud("FACTURA", null)));
@@ -113,6 +127,6 @@ class VentaComprobanteTest {
         return new VentaDto(null, null, clienteId, null,
                 List.of(new DetalleVentaDto(null, 1L, 1, null, null, null, null, null)),
                 "EFECTIVO", new BigDecimal("10.00"), null, false, null, null,
-                "clave-" + tipo + "-" + clienteId, null, tipo, null, null);
+                "clave-" + tipo + "-" + clienteId, null, tipo, null, null, null, null, null);
     }
 }

@@ -70,7 +70,8 @@ existencias detalladas y se actualizan junto con los movimientos.
 - `Venta`: `id`, fecha, `clienteId` (opcional en boletas), total, método de pago,
   importe recibido, vuelto, confirmación manual y actor/fecha de pago, `farmaciaId`,
   clave y huella idempotentes, estado, líneas, `tipoComprobante`
-  (`BOLETA_INTERNA`/`BOLETA_ELECTRONICA`/`FACTURA`) y serie/número del comprobante.
+  (`BOLETA_INTERNA`/`BOLETA_ELECTRONICA`/`FACTURA`), serie/número del comprobante,
+  usuario que la registró y copia del nombre y documento del cliente al vender.
 - `CorrelativoComprobante`: siguiente número por farmacia y serie de la boleta interna (`I001`).
 - `DetalleVenta`: `id`, `productoId`, cantidad, precio unitario, subtotal,
   snapshot de nombre del producto y datos tributarios (`afectacionIgv`,
@@ -113,7 +114,7 @@ existencias detalladas y se actualizan junto con los movimientos.
 | Auth | V1–V6 |
 | Clientes | V1, V2, V5 |
 | Catálogo | V1–V8 |
-| Ventas | V1–V9 |
+| Ventas | V1–V10 |
 | Personal | V1–V2 |
 | Auditoría | V1 |
 
