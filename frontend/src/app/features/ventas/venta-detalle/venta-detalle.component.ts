@@ -23,6 +23,8 @@ import {
   EmisorComprobante
 } from '../../../models/facturacion.model';
 import { calcularTotales, htmlComprobante, imprimirHtml } from './comprobante-impreso';
+import { InventarioService } from '../../../services/inventario.service';
+import { LotesDeVenta } from '../../../models/inventario.model';
 
 @Component({
   selector: 'app-venta-detalle',
@@ -111,6 +113,20 @@ import { calcularTotales, htmlComprobante, imprimirHtml } from './comprobante-im
               <ng-container matColumnDef="productoId">
                 <th mat-header-cell *matHeaderCellDef>Producto</th>
                 <td mat-cell *matCellDef="let row">{{ row.nombreProducto ?? nombresProducto()[row.productoId] ?? ('Producto #' + row.productoId) }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="lote">
+                <th mat-header-cell *matHeaderCellDef>Lote / vence (FEFO)</th>
+                <td mat-cell *matCellDef="let row">
+                  @for (l of lotesDe(row.productoId); track l.loteId) {
+                    <span class="lote-linea">
+                      <span class="mono">{{ l.codigoLote }}</span>
+                      <small>Vto: {{ l.fechaVencimiento | date:'dd/MM/yyyy' }}@if (lotesDe(row.productoId).length > 1) { · {{ l.cantidad }} un. }</small>
+                    </span>
+                  } @empty {
+                    <small class="sin-lote">{{ venta()!.estado === 'CONFIRMADA' ? '—' : 'Pendiente' }}</small>
+                  }
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="cantidad">
@@ -216,6 +232,8 @@ import { calcularTotales, htmlComprobante, imprimirHtml } from './comprobante-im
     </div>
   `,
   styles: [`
+    .lote-linea { display: block; }
+    .lote-linea small, .sin-lote { color: var(--kipu-soft); margin-left: 4px; }
     .acciones-cabecera { display: flex; gap: 8px; flex-wrap: wrap; }
     .venta-info { display: flex; gap: 32px; margin-bottom: 16px; flex-wrap: wrap; }
     .info-item { display: flex; gap: 8px; }
@@ -247,6 +265,7 @@ export class VentaDetalleComponent implements OnInit {
   private clienteService = inject(ClienteService);
   private productoService = inject(ProductoService);
   private facturacionService = inject(FacturacionService);
+  private inventarioService = inject(InventarioService);
   private authService = inject(AuthService);
   private snackBar = inject(MatSnackBar);
   private router = inject(Router);
@@ -263,7 +282,12 @@ export class VentaDetalleComponent implements OnInit {
 
   readonly puedeGestionar = this.authService.hasPermission('VENTAS:GESTIONAR');
 
-  displayedColumns = ['productoId', 'cantidad', 'precioUnitario', 'subtotal'];
+  displayedColumns = ['productoId', 'lote', 'cantidad', 'precioUnitario', 'subtotal'];
+  lotesVenta = signal<LotesDeVenta['lineas']>([]);
+
+  lotesDe(productoId: number) {
+    return this.lotesVenta().filter(l => l.productoId === productoId);
+  }
 
   tipoEtiqueta = computed(() => TIPOS_COMPROBANTE[this.venta()?.tipoComprobante ?? 'BOLETA_INTERNA']);
   esElectronico = computed(() => {
@@ -321,6 +345,13 @@ export class VentaDetalleComponent implements OnInit {
         next: productos => this.nombresProducto.set(
           Object.fromEntries(productos.filter(p => p.id != null).map(p => [p.id!, p.nombre]))),
         error: err => console.error('No se pudieron cargar los nombres de productos.', err)
+      });
+    }
+    if (venta.estado === 'CONFIRMADA' && venta.claveIdempotencia) {
+      this.inventarioService.lotesDeVenta(venta.claveIdempotencia).subscribe({
+        next: salida => this.lotesVenta.set(salida.lineas),
+        // 404: ventas antiguas sin salida registrada por lote.
+        error: err => { if (err?.status !== 404) console.error('No se pudieron cargar los lotes de la venta.', err); }
       });
     }
     this.facturacionService.obtenerOpciones().subscribe({

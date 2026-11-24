@@ -34,6 +34,8 @@ export interface Venta {
   pagoConfirmadoPor?: string;
   pagoConfirmadoEn?: Date | string;
   estado?: string;
+  /** Clave con la que el inventario registró la salida de esta venta. */
+  claveIdempotencia?: string;
   tipoComprobante?: TipoComprobante;
   serieComprobante?: string | null;
   numeroComprobante?: string | null;

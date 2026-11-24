@@ -56,8 +56,9 @@ exactas, índices, defaults y tipos SQL se definen en las migraciones.
   solicitud, documento de referencia, actor y fecha.
 - `LoteInventario`: `id`, farmacia/producto, código, fecha de vencimiento,
   cantidades inicial/disponible, verificación y fecha de creación.
-- `MovimientoInventario`: `id`, farmacia/producto/lote/ingreso/salida, tipo,
-  cantidad con signo, clave de idempotencia, actor y fecha.
+- `MovimientoInventario`: `id`, farmacia/producto/lote/ingreso/salida, tipo
+  (`INGRESO`, `VENTA`, `AJUSTE`), cantidad con signo, clave de idempotencia,
+  actor, fecha y, en ajustes, motivo y observación.
 - `SalidaInventario`: `id`, farmacia, clave/huella idempotente, actor/fecha.
 - `CatalogoImportacionInicial`: farmacia y fecha de importación.
 
@@ -111,7 +112,7 @@ existencias detalladas y se actualizan junto con los movimientos.
 |---|---|
 | Auth | V1–V6 |
 | Clientes | V1, V2, V5 |
-| Catálogo | V1–V7 |
+| Catálogo | V1–V8 |
 | Ventas | V1–V9 |
 | Personal | V1–V2 |
 | Auditoría | V1 |

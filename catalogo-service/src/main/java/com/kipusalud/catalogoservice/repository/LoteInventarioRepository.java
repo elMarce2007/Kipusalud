@@ -42,4 +42,28 @@ public interface LoteInventarioRepository extends JpaRepository<LoteInventario, 
             @Param("farmaciaId") Long farmaciaId,
             @Param("productoId") Long productoId,
             @Param("hoy") LocalDate hoy);
+
+    /** Lotes vendibles en orden FEFO, sin bloqueo (para la vista previa del punto de venta). */
+    @Query("""
+            select l from LoteInventario l
+            where l.farmaciaId = :farmaciaId
+              and l.productoId = :productoId
+              and l.verificado = true
+              and l.cantidadDisponible > 0
+              and l.fechaVencimiento is not null
+              and l.fechaVencimiento >= :hoy
+            order by l.fechaVencimiento asc, l.creadoEn asc, l.id asc
+            """)
+    List<LoteInventario> findSellableLots(
+            @Param("farmaciaId") Long farmaciaId,
+            @Param("productoId") Long productoId,
+            @Param("hoy") LocalDate hoy);
+
+    /** Lotes con existencias de la farmacia, para el resumen de inventario. */
+    List<LoteInventario> findAllByFarmaciaIdAndCantidadDisponibleGreaterThan(Long farmaciaId, int cantidad);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select l from LoteInventario l where l.id = :id and l.farmaciaId = :farmaciaId")
+    java.util.Optional<LoteInventario> findByIdAndFarmaciaIdForUpdate(
+            @Param("id") Long id, @Param("farmaciaId") Long farmaciaId);
 }

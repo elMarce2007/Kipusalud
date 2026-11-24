@@ -48,6 +48,17 @@ public class MovimientoInventario {
     @Column(name = "creado_en", nullable = false)
     private LocalDateTime creadoEn;
 
+    /** Solo en ajustes: MERMA, VENCIMIENTO, DANIO, CONTEO, DEVOLUCION_PROVEEDOR u OTRO. */
+    @Column(length = 30)
+    private String motivo;
+
+    @Column(length = 255)
+    private String observacion;
+
+    public String getMotivo() { return motivo; }
+    public void setMotivo(String motivo) { this.motivo = motivo; }
+    public String getObservacion() { return observacion; }
+    public void setObservacion(String observacion) { this.observacion = observacion; }
     public Long getId() { return id; }
     public Long getFarmaciaId() { return farmaciaId; }
     public void setFarmaciaId(Long farmaciaId) { this.farmaciaId = farmaciaId; }

@@ -70,6 +70,10 @@ Controlador: `catalogo-service/.../controller/InventarioController.java`.
 | POST | `/api/inventario/ventas/salida` | `INVENTARIO:GESTIONAR`; salida idempotente y descuento FEFO |
 | GET | `/api/inventario/productos/{productoId}/kardex` | `INVENTARIO:VER` |
 | GET | `/api/inventario/alertas?diasVencimiento=30` | `INVENTARIO:VER` |
+| GET | `/api/inventario/resumen?diasPorVencer=60` | `INVENTARIO:VER`; por producto: stock, mínimo, lote FEFO activo, lotes vigentes, lotes por vencer y unidades vencidas |
+| GET | `/api/inventario/productos/{productoId}/fefo?cantidad=N` | `INVENTARIO:VER`; vista previa de los lotes que usaría una venta, sin descontar (`completa`, `faltante`) |
+| GET | `/api/inventario/ventas/{claveIdempotencia}/lotes` | `INVENTARIO:VER`; lotes de los que salió cada producto de una venta; `404` si no hay salida |
+| POST | `/api/inventario/ajustes` | `INVENTARIO:GESTIONAR` y rol administrador o QF; baja idempotente de unidades de un lote (motivos `MERMA`, `VENCIMIENTO`, `DANIO`, `CONTEO`, `DEVOLUCION_PROVEEDOR`, `OTRO` con observación); `409` si dejaría stock negativo |
 
 ## Importación del catálogo inicial — `catalogo-service`
 

@@ -13,6 +13,7 @@ public record SalidaVentaDto(
             Long loteId,
             String codigoLote,
             Integer cantidad,
-            LocalDateTime creadoEn
+            LocalDateTime creadoEn,
+            java.time.LocalDate fechaVencimiento
     ) {}
 }

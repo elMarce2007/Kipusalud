@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, ViewChild, AfterViewInit, signal, computed, effect } from '@angular/core';
-import { forkJoin } from 'rxjs';
+import { catchError, forkJoin, of } from 'rxjs';
 import { RouterLink } from '@angular/router';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
@@ -9,7 +9,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { CurrencyPipe } from '@angular/common';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 
 import { ProductoService } from '../../../../services/producto.service';
 import { Producto } from '../../../../models/producto.model';
@@ -25,6 +25,14 @@ import {
   tonoEstadoStock
 } from '../../../../shared/components/stock-meter/stock-meter.component';
 import { descargarCsv } from '../../../../shared/utils/csv';
+import { InventarioService } from '../../../../services/inventario.service';
+import {
+  LoteInventario,
+  MovimientoInventario,
+  ResumenInventario,
+  tonoVencimiento
+} from '../../../../models/inventario.model';
+import { LineaVidaLoteComponent } from '../../../../shared/components/linea-vida-lote/linea-vida-lote.component';
 
 @Component({
   selector: 'app-producto-list',
@@ -40,7 +48,9 @@ import { descargarCsv } from '../../../../shared/utils/csv';
     MatCardModule,
     PageHeaderComponent,
     KpiCardComponent,
-    StockMeterComponent
+    StockMeterComponent,
+    LineaVidaLoteComponent,
+    DatePipe
   ],
   template: `
     <div class="page-container">
@@ -70,6 +80,8 @@ import { descargarCsv } from '../../../../shared/utils/csv';
                       nota="Cerca del mínimo" icono="add_shopping_cart" tono="warn" />
         <app-kpi-card etiqueta="Crítico o agotado" [valor]="conteo().critico"
                       nota="Bajo el stock mínimo" icono="priority_high" tono="danger" />
+        <app-kpi-card etiqueta="Lotes por vencer" [valor]="lotesPorVencer()"
+                      nota="En los próximos 60 días" icono="event_busy" [tono]="lotesPorVencer() ? 'warn' : 'ok'" />
       </section>
 
       <div class="filter-bar" role="search">
@@ -92,6 +104,7 @@ import { descargarCsv } from '../../../../shared/utils/csv';
         <span class="filter-count">Mostrando {{ filtrados().length }} de {{ productos().length }}</span>
       </div>
 
+      <div class="con-panel" [class.abierto]="!!seleccionado()">
       <mat-card class="ledger-card">
         <mat-card-content>
           <div class="table-wrap">
@@ -114,6 +127,23 @@ import { descargarCsv } from '../../../../shared/utils/csv';
                 <td mat-cell *matCellDef="let row"><span class="chip">{{ row.categoriaNombre || '—' }}</span></td>
               </ng-container>
 
+              <ng-container matColumnDef="lote">
+                <th mat-header-cell *matHeaderCellDef>Lote FEFO / vence</th>
+                <td mat-cell *matCellDef="let row">
+                  @if (resumenDe(row)?.loteFefo; as fefo) {
+                    <span class="mono lote">{{ fefo.codigoLote }}</span>
+                    <span class="vence" [class]="tonoVence(fefo.fechaVencimiento)">
+                      {{ fefo.fechaVencimiento | date:'MMM yyyy' }}
+                    </span>
+                  } @else {
+                    <span class="sub">Sin lote vigente</span>
+                  }
+                  @if ((resumenDe(row)?.unidadesVencidas ?? 0) > 0) {
+                    <span class="chip danger vencidas">{{ resumenDe(row)!.unidadesVencidas }} un. vencidas</span>
+                  }
+                </td>
+              </ng-container>
+
               <ng-container matColumnDef="stock">
                 <th mat-header-cell *matHeaderCellDef mat-sort-header>Stock actual / mín.</th>
                 <td mat-cell *matCellDef="let row">
@@ -133,7 +163,7 @@ import { descargarCsv } from '../../../../shared/utils/csv';
 
               <ng-container matColumnDef="acciones">
                 <th mat-header-cell *matHeaderCellDef>Acciones</th>
-                <td mat-cell *matCellDef="let row">
+                <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
                   <button mat-icon-button [routerLink]="['editar', row.id]" aria-label="Editar producto">
                     <mat-icon>edit</mat-icon>
                   </button>
@@ -144,10 +174,11 @@ import { descargarCsv } from '../../../../shared/utils/csv';
               </ng-container>
 
               <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="fila"
+                  [class.activa]="seleccionado()?.id === row.id" (click)="seleccionar(row)"></tr>
 
               <tr class="mat-row" *matNoDataRow>
-                <td class="mat-cell" colspan="6" style="text-align: center; padding: 20px;">
+                <td class="mat-cell" colspan="7" style="text-align: center; padding: 20px;">
                   No se encontraron productos con esos filtros
                 </td>
               </tr>
@@ -156,24 +187,123 @@ import { descargarCsv } from '../../../../shared/utils/csv';
           <mat-paginator [pageSizeOptions]="[10, 25, 50]" showFirstLastButtons></mat-paginator>
         </mat-card-content>
       </mat-card>
+
+      @if (seleccionado(); as p) {
+        <aside class="detalle-panel" aria-label="Detalle del producto">
+          <header>
+            <span class="kpi-label">Producto seleccionado</span>
+            <button mat-icon-button type="button" aria-label="Cerrar panel" (click)="seleccionado.set(null)">
+              <mat-icon>close</mat-icon>
+            </button>
+          </header>
+          <h2>{{ p.nombre }}</h2>
+          @if (p.descripcion) { <p class="sub">{{ p.descripcion }}</p> }
+          <app-stock-meter [stock]="p.stock" [minimo]="p.stockMinimo" />
+
+          <h3 class="kpi-label">Lotes con existencias</h3>
+          @if (cargandoDetalle()) {
+            <p class="sub">Cargando lotes…</p>
+          } @else {
+            <ul class="lotes">
+              @for (l of lotesSeleccionado(); track l.id; let primero = $first) {
+                <li>
+                  <span class="mono">{{ l.codigoLote }}</span>
+                  <span class="vence" [class]="tonoVence(l.fechaVencimiento)">{{ l.fechaVencimiento | date:'dd/MM/yyyy' }}</span>
+                  <span class="num">{{ l.cantidadDisponible }}/{{ l.cantidadInicial }}</span>
+                  @if (primero && l.cantidadDisponible > 0) { <span class="chip ok">FEFO #1</span> }
+                </li>
+              } @empty {
+                <li class="sub">Sin lotes con existencias.</li>
+              }
+            </ul>
+            <h3 class="kpi-label">Línea de vida del lote</h3>
+            <app-linea-vida-lote [movimientos]="kardexSeleccionado()" />
+          }
+          <div class="acciones-panel">
+            <a mat-stroked-button routerLink="/inventario"><mat-icon>add_box</mat-icon> Registrar ingreso</a>
+            <a mat-stroked-button [routerLink]="['editar', p.id]"><mat-icon>edit</mat-icon> Editar</a>
+          </div>
+        </aside>
+      }
+      </div>
     </div>
   `,
-  styles: ``
+  styles: `
+    .con-panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; }
+    .con-panel.abierto { grid-template-columns: minmax(0, 1fr) 360px; }
+    .fila { cursor: pointer; }
+    .fila.activa { background: var(--kipu-danger-bg) !important; }
+    .lote { display: block; font-size: 12px; }
+    .vence { display: inline-block; font-size: 12px; font-weight: 600; }
+    .vence.ok { color: var(--kipu-ok-fg); }
+    .vence.warn { color: var(--kipu-warn-fg); }
+    .vence.danger { color: var(--kipu-danger-fg); }
+    .vencidas { margin-top: 4px; }
+    .sub { display: block; color: var(--kipu-soft); font-size: 12px; }
+    .detalle-panel { position: sticky; top: 80px; padding: 18px 20px; border: 1px solid var(--kipu-line);
+      border-top: 3px solid var(--kipu-primary-container); border-radius: var(--kipu-radius); background: #fff; }
+    .detalle-panel header { display: flex; justify-content: space-between; align-items: center; }
+    .detalle-panel h2 { margin: 4px 0; font-size: 22px; }
+    .detalle-panel h3 { margin: 18px 0 8px; }
+    .lotes { list-style: none; margin: 0; padding: 0; }
+    .lotes li { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center;
+      padding: 6px 0; border-bottom: 1px solid var(--kipu-line); font-size: 13px; }
+    .acciones-panel { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    @media (max-width: 1100px) { .con-panel.abierto { grid-template-columns: 1fr; } .detalle-panel { position: static; } }
+  `
 })
 export class ProductoListComponent implements OnInit, AfterViewInit {
   private productoService = inject(ProductoService);
   private categoriaService = inject(CategoriaService);
+  private inventarioService = inject(InventarioService);
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
 
-  displayedColumns = ['nombre', 'categoria', 'stock', 'precio', 'estado', 'acciones'];
+  displayedColumns = ['nombre', 'categoria', 'lote', 'stock', 'precio', 'estado', 'acciones'];
   dataSource = new MatTableDataSource<Producto>();
   loadError = signal<string | null>(null);
 
   productos = signal<Producto[]>([]);
+  resumenes = signal<Map<number, ResumenInventario>>(new Map());
+  lotesPorVencer = computed(() => [...this.resumenes().values()].reduce((s, r) => s + r.lotesPorVencer, 0));
+  seleccionado = signal<Producto | null>(null);
+  lotesSeleccionado = signal<LoteInventario[]>([]);
+  kardexSeleccionado = signal<MovimientoInventario[]>([]);
+  cargandoDetalle = signal(false);
+  readonly tonoVence = tonoVencimiento;
+
+  resumenDe(p: Producto): ResumenInventario | undefined {
+    return this.resumenes().get(p.id!);
+  }
+
+  seleccionar(producto: Producto) {
+    if (this.seleccionado()?.id === producto.id) {
+      this.seleccionado.set(null);
+      return;
+    }
+    this.seleccionado.set(producto);
+    this.cargandoDetalle.set(true);
+    forkJoin({
+      lotes: this.inventarioService.listarLotes(producto.id!),
+      kardex: this.inventarioService.listarKardex(producto.id!)
+    }).subscribe({
+      next: ({ lotes, kardex }) => {
+        if (this.seleccionado()?.id !== producto.id) return;
+        this.lotesSeleccionado.set(lotes.filter(l => l.cantidadDisponible > 0));
+        this.kardexSeleccionado.set(kardex.slice(0, 12));
+        this.cargandoDetalle.set(false);
+      },
+      error: err => {
+        console.error('No se pudo cargar el detalle de lotes.', err);
+        this.lotesSeleccionado.set([]);
+        this.kardexSeleccionado.set([]);
+        this.cargandoDetalle.set(false);
+      }
+    });
+  }
   categorias = signal<Categoria[]>([]);
   texto = signal('');
   categoria = signal('');
@@ -229,9 +359,12 @@ export class ProductoListComponent implements OnInit, AfterViewInit {
     this.loadError.set(null);
     forkJoin({
       productos: this.productoService.listar(),
-      categorias: this.categoriaService.listar()
+      categorias: this.categoriaService.listar(),
+      // El resumen de lotes es complementario: si falla, la tabla se muestra sin esa columna llena.
+      resumen: this.inventarioService.resumen(60).pipe(catchError(() => of([] as ResumenInventario[])))
     }).subscribe({
-      next: ({ productos, categorias }) => {
+      next: ({ productos, categorias, resumen }) => {
+        this.resumenes.set(new Map(resumen.map(r => [r.productoId, r])));
         const nombrePorCategoria = new Map(categorias.map(categoria => [categoria.id, categoria.nombre]));
         this.categorias.set(categorias);
         this.productos.set(productos.map(producto => ({
