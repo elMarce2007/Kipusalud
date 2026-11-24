@@ -10,6 +10,10 @@ export const AUTH_ROUTES: Routes = [
     loadComponent: () => import('./registro/registro.component').then(m => m.RegistroComponent)
   },
   {
+    path: 'recuperar',
+    loadComponent: () => import('./recuperar/recuperar.component').then(m => m.RecuperarComponent)
+  },
+  {
     path: '',
     redirectTo: 'login',
     pathMatch: 'full'

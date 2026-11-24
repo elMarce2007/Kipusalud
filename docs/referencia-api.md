@@ -18,6 +18,9 @@ Controlador: `auth-service/.../controller/AuthController.java`.
 | PUT | `/api/auth/usuarios/{id}` | `USUARIOS:GESTIONAR` |
 | GET | `/api/auth/farmacia` | `FARMACIA:VER` |
 | PUT | `/api/auth/farmacia` | `FARMACIA:EDITAR` |
+| POST | `/api/auth/usuarios/{id}/codigo-recuperacion` | `USUARIOS:GESTIONAR`; `201` con un código de 6 dígitos válido 15 min (se muestra una vez). No para el administrador ni la propia cuenta; el gerente solo para Empleado/Cajero; `409` si la cuenta está desactivada |
+| POST | `/api/auth/recuperar-password` | Público; `{farmaciaCodigo, username, codigo, nuevaPassword}`; `204`. Código de un solo uso, guardado con hash, invalidado tras 5 intentos o al generar otro; cualquier fallo devuelve el mismo `400` |
+| PUT | `/api/auth/mi-password` | Usuario autenticado; `{passwordActual, nuevaPassword}`; `204` |
 | POST | `/api/auth/demo/sessions` | Público solo si `DEMO_SESSIONS_ENABLED=true`; entrega una vez credenciales aleatorias de cuatro roles |
 
 ## Clientes — `cliente-service`
@@ -82,6 +85,8 @@ Controlador: `catalogo-service/.../controller/InventarioController.java`.
 | GET | `/api/inventario/alertas?diasVencimiento=30` | `INVENTARIO:VER` |
 | GET | `/api/inventario/resumen?diasPorVencer=60` | `INVENTARIO:VER`; por producto: stock, mínimo, lote FEFO activo, lotes vigentes, lotes por vencer, unidades vencidas, `valorInventario` (costo × disponible de los lotes con costo) y `unidadesSinCosto` |
 | GET | `/api/inventario/productos/{productoId}/fefo?cantidad=N` | `INVENTARIO:VER`; vista previa de los lotes que usaría una venta, sin descontar (`completa`, `faltante`) |
+| GET | `/api/inventario/reportes/kardex?productoId=&desde=&hasta=` | `INVENTARIO:VER`; Kardex físico-valorizado: saldo inicial, movimientos con saldo y valor acumulado (costo del lote), saldo final, costo promedio y unidades sin costo. Fechas ISO; por defecto el mes en curso; máximo un año |
+| GET | `/api/inventario/reportes/mermas?desde=&hasta=` | `INVENTARIO:VER`; bajas del período con valor, totales por motivo y tasa de merma (bajas ÷ (ventas + bajas)) |
 | GET | `/api/inventario/ventas/{claveIdempotencia}/lotes` | `INVENTARIO:VER`; lotes de los que salió cada producto de una venta; `404` si no hay salida |
 | POST | `/api/inventario/ajustes` | `INVENTARIO:GESTIONAR` y rol administrador o QF; baja idempotente de unidades de un lote (motivos `MERMA`, `VENCIMIENTO`, `DANIO`, `CONTEO`, `DEVOLUCION_PROVEEDOR`, `OTRO` con observación); `409` si dejaría stock negativo |
 
@@ -106,6 +111,7 @@ Controlador: `ventas-service/.../controller/VentaController.java`.
 | GET | `/api/ventas` | `VENTAS:VER` |
 | GET | `/api/ventas/{id}` | `VENTAS:VER` |
 | POST | `/api/ventas` | `VENTAS:GESTIONAR`; requiere clave idempotente, detalles y `tipoComprobante` (`BOLETA_INTERNA` por defecto, `BOLETA_ELECTRONICA` o `FACTURA`). Cliente opcional en boletas, obligatorio con RUC en factura; boleta electrónica desde S/ 700 exige DNI. Al confirmar, la boleta interna recibe correlativo `I001-…` y los electrónicos se emiten en SUNAT automáticamente. `201` si confirmada, `202` si pendiente, `412` si el comprobante electrónico no está habilitado |
+| GET | `/api/ventas/reportes/turnos?desde=&hasta=` | `VENTAS:VER`; ventas confirmadas por turno (mañana 07–15, tarde 15–23, noche 23–07), vendedor, método de pago y día; cuenta las no confirmadas |
 | GET | `/api/ventas/clientes/resumen` | `VENTAS:VER`; por cliente: compras confirmadas, total comprado y fecha de la última compra |
 | POST | `/api/ventas/{id}/reintentar` | `VENTAS:GESTIONAR`; reintenta solo venta `PENDIENTE_STOCK` |
 | GET | `/api/ventas/facturacion/configuracion` | Solo administrador/QF; perfil fiscal sin secretos (`404` si no existe) |

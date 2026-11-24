@@ -9,6 +9,8 @@ import java.util.Optional;
 public interface VentaRepository extends JpaRepository<Venta, Long> {
     List<Venta> findAllByFarmaciaIdOrderByFechaDesc(Long farmaciaId);
     Optional<Venta> findByIdAndFarmaciaId(Long id, Long farmaciaId);
+    List<Venta> findAllByFarmaciaIdAndFechaGreaterThanEqualAndFechaBeforeOrderByFechaAsc(
+            Long farmaciaId, java.time.LocalDateTime desde, java.time.LocalDateTime hasta);
     Optional<Venta> findByFarmaciaIdAndClaveIdempotencia(Long farmaciaId, String claveIdempotencia);
     List<Venta> findByClienteIdAndFarmaciaId(Long clienteId, Long farmaciaId);
 

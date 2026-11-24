@@ -7,6 +7,10 @@ export const PERSONAL_ROUTES: Routes = [
       .then(m => m.PersonalListComponent)
   },
   {
+    path: 'turnos',
+    loadComponent: () => import('./turnos/turnos.component').then(m => m.TurnosComponent)
+  },
+  {
     path: 'nuevo',
     loadComponent: () => import('./personal-form/personal-form.component')
       .then(m => m.PersonalFormComponent)

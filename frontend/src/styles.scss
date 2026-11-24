@@ -949,3 +949,17 @@ mat-card { border: 1px solid var(--kipu-line); background: #fff; box-shadow: 0 1
   .filter-bar select { flex: 1 1 140px; min-width: 0; }
   .kpi-card .kpi-value { font-size: 26px; }
 }
+
+/* Impresión de reportes ("Descargar PDF"): solo el contenido principal. */
+.solo-impresion { display: none; }
+@media print {
+  @page { size: A4 landscape; margin: 12mm; }
+  body { background: #fff !important; }
+  app-sidenav, app-toolbar, .mat-drawer, .no-print, .mat-mdc-snack-bar-container { display: none !important; }
+  .mat-drawer-container, .mat-drawer-content, .main-content { margin: 0 !important; padding: 0 !important;
+    overflow: visible !important; height: auto !important; background: #fff !important; }
+  .solo-impresion { display: block !important; }
+  .mat-mdc-card, .kpi-card { box-shadow: none !important; break-inside: avoid; }
+  table { font-size: 10px; }
+  tr { break-inside: avoid; }
+}

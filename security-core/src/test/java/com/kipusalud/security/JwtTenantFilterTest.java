@@ -41,6 +41,27 @@ class JwtTenantFilterTest {
     }
 
     @Test
+    void passwordRecoveryIsPublicButCodesNeedUserManagement() throws Exception {
+        JwtTenantFilter filter = new JwtTenantFilter(JWT_SECRET, new ObjectMapper());
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/recuperar-password");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+        filter.doFilter(request, response, chain);
+        verify(chain).doFilter(request, response);
+
+        assertEquals(403, statusFor("EMPLEADO", "POST", "/api/auth/usuarios/5/codigo-recuperacion"));
+        assertEquals(403, statusFor("QF_REGENTE", "POST", "/api/auth/usuarios/5/codigo-recuperacion"));
+        assertEquals(200, statusFor("ADMINISTRADOR", "POST", "/api/auth/usuarios/5/codigo-recuperacion"));
+        assertEquals(200, statusFor("EMPLEADO", "PUT", "/api/auth/mi-password"));
+    }
+
+    @Test
+    void reportsFollowModulePermissions() throws Exception {
+        assertEquals(200, statusFor("EMPLEADO", "GET", "/api/inventario/reportes/kardex"));
+        assertEquals(200, statusFor("GERENTE_SUPERVISOR", "GET", "/api/ventas/reportes/turnos"));
+    }
+
+    @Test
     void anySalesUserCanReadReceiptOptions() throws Exception {
         assertEquals(200, statusFor("EMPLEADO", "GET", "/api/ventas/facturacion/opciones"));
     }

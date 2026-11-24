@@ -12,6 +12,8 @@ interface NavItem {
   route: string;
   roles?: readonly string[];
   permission?: string;
+  /** Resaltar solo en la ruta exacta (p. ej. Personal frente a Personal › Turnos). */
+  exacto?: boolean;
 }
 
 @Component({
@@ -46,6 +48,7 @@ interface NavItem {
           <a mat-list-item
              [routerLink]="item.route"
              routerLinkActive="active"
+             [routerLinkActiveOptions]="{ exact: !!item.exacto }"
              [matTooltip]="!expanded() ? item.label : ''"
              matTooltipPosition="right">
             <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
@@ -83,7 +86,9 @@ export class SidenavComponent {
     { label: 'Productos y stock', icon: 'inventory_2', route: '/catalogo/productos', permission: 'CATALOGO:VER' },
     { label: 'Ingresos y Kardex', icon: 'receipt_long', route: '/inventario', permission: 'INVENTARIO:VER' },
     { label: 'Ventas y despacho', icon: 'point_of_sale', route: '/ventas', permission: 'VENTAS:VER' },
-    { label: 'Personal', icon: 'badge', route: '/personal', permission: 'PERSONAL:VER' },
+    { label: 'Reportes', icon: 'monitoring', route: '/reportes', permission: 'INVENTARIO:VER' },
+    { label: 'Personal', icon: 'badge', route: '/personal', permission: 'PERSONAL:VER', exacto: true },
+    { label: 'Turnos', icon: 'calendar_month', route: '/personal/turnos', permission: 'PERSONAL:VER' },
     { label: 'Usuarios', icon: 'manage_accounts', route: '/usuarios', permission: 'USUARIOS:VER' },
     { label: 'Farmacia', icon: 'local_pharmacy', route: '/farmacia', permission: 'FARMACIA:VER' },
     { label: 'Administración', icon: 'admin_panel_settings', route: '/administracion', roles: ['ADMINISTRADOR'] }

@@ -26,17 +26,20 @@ public class VentaController {
     private final FacturaSunatService facturaSunatService;
     private final SunatConfiguracionService sunatConfiguracionService;
     private final RegistroVentaService registroVentaService;
+    private final com.kipusalud.ventasservice.service.ReporteVentasService reporteVentasService;
 
     public VentaController(
             VentaService ventaService,
             FacturaSunatService facturaSunatService,
             SunatConfiguracionService sunatConfiguracionService,
-            RegistroVentaService registroVentaService
+            RegistroVentaService registroVentaService,
+            com.kipusalud.ventasservice.service.ReporteVentasService reporteVentasService
     ) {
         this.ventaService = ventaService;
         this.facturaSunatService = facturaSunatService;
         this.sunatConfiguracionService = sunatConfiguracionService;
         this.registroVentaService = registroVentaService;
+        this.reporteVentasService = reporteVentasService;
     }
 
     @GetMapping
@@ -82,6 +85,18 @@ public class VentaController {
     }
 
     /** Compras confirmadas por cliente (número, total y última compra). */
+    /** Ventas por turno, vendedor, método de pago y día (fechas ISO; por defecto el mes en curso). */
+    @GetMapping("/reportes/turnos")
+    public ResponseEntity<com.kipusalud.ventasservice.dto.ReporteVentasTurnoDto> reportePorTurno(
+            @RequestParam(required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+            java.time.LocalDate desde,
+            @RequestParam(required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+            java.time.LocalDate hasta) {
+        return ResponseEntity.ok(reporteVentasService.porTurno(desde, hasta));
+    }
+
     @GetMapping("/clientes/resumen")
     public ResponseEntity<List<com.kipusalud.ventasservice.dto.ResumenClienteDto>> resumenPorCliente() {
         return ResponseEntity.ok(ventaService.resumenPorCliente());

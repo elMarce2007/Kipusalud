@@ -55,6 +55,13 @@ export const routes: Routes = [
         data: { permission: 'INVENTARIO:VER' }
       },
       {
+        path: 'reportes',
+        loadComponent: () => import('./features/reportes/reportes.component')
+          .then(m => m.ReportesComponent),
+        canActivate: [permissionGuard],
+        data: { permission: 'INVENTARIO:VER' }
+      },
+      {
         path: 'personal',
         loadChildren: () => import('./features/personal/personal.routes')
           .then(m => m.PERSONAL_ROUTES),

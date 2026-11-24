@@ -15,6 +15,12 @@ public interface MovimientoInventarioRepository extends JpaRepository<Movimiento
     List<MovimientoInventario> findAllByFarmaciaIdAndSalidaIdOrderByIdAsc(
             Long farmaciaId, Long salidaId);
 
+    List<MovimientoInventario> findAllByFarmaciaIdAndProductoIdAndCreadoEnBeforeOrderByCreadoEnAscIdAsc(
+            Long farmaciaId, Long productoId, java.time.LocalDateTime hasta);
+
+    List<MovimientoInventario> findAllByFarmaciaIdAndTipoAndCreadoEnGreaterThanEqualAndCreadoEnBeforeOrderByCreadoEnAscIdAsc(
+            Long farmaciaId, String tipo, java.time.LocalDateTime desde, java.time.LocalDateTime hasta);
+
     Optional<MovimientoInventario> findByFarmaciaIdAndClaveIdempotencia(
             Long farmaciaId, String claveIdempotencia);
 }

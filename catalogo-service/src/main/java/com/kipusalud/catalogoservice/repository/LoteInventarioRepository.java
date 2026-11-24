@@ -62,6 +62,8 @@ public interface LoteInventarioRepository extends JpaRepository<LoteInventario, 
     /** Lotes con existencias de la farmacia, para el resumen de inventario. */
     List<LoteInventario> findAllByFarmaciaIdAndCantidadDisponibleGreaterThan(Long farmaciaId, int cantidad);
 
+    List<LoteInventario> findAllByFarmaciaIdAndIdIn(Long farmaciaId, java.util.Collection<Long> ids);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select l from LoteInventario l where l.id = :id and l.farmaciaId = :farmaciaId")
     java.util.Optional<LoteInventario> findByIdAndFarmaciaIdForUpdate(

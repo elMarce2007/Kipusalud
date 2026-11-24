@@ -6,6 +6,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDividerModule } from '@angular/material/divider';
 import { AuthService } from '../../services/auth.service';
+import { MatDialog } from '@angular/material/dialog';
+import { CambiarPasswordDialogComponent } from './cambiar-password-dialog.component';
 
 @Component({
   selector: 'app-toolbar',
@@ -50,6 +52,10 @@ import { AuthService } from '../../services/auth.service';
           <small>{{ rol() }}</small>
         </div>
         <mat-divider></mat-divider>
+        <button mat-menu-item (click)="cambiarPassword()">
+          <mat-icon>key</mat-icon>
+          <span>Cambiar contraseña</span>
+        </button>
         <button mat-menu-item (click)="authService.logout()">
           <mat-icon>logout</mat-icon>
           <span>Cerrar sesión</span>
@@ -81,4 +87,9 @@ export class ToolbarComponent {
 
   authService = inject(AuthService);
   rol = computed(() => etiquetaRol(this.authService.usuario()?.rol));
+  private dialog = inject(MatDialog);
+
+  cambiarPassword() {
+    this.dialog.open(CambiarPasswordDialogComponent, { autoFocus: 'first-tabbable' });
+  }
 }
