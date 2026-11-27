@@ -31,3 +31,17 @@ _nul
 # Logs and temporary files
 *.log
 *.tmp
+
+# Documentación local y entregables (no forman parte del programa)
+docs/
+
+# Restos de IDE y asistentes
+.idea/
+.vscode/
+*.iml
+.claude/
+.github/modernize/
+AGENTS.md
+CLAUDE.md
+a.out
+_nul
